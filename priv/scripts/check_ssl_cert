@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    echo "you have to specify a file"
+    exit 127
+fi
+
+file=$1
+cert=$(openssl x509 -noout -text -in "$file" | grep "Not After" | sed -e 's#^.*Not After *: ##')
+cert_timestamp=$(date --date="$cert" +%s)
+now_timestamp=$(date +%s)
+diff_seconds=$(expr $cert_timestamp - $now_timestamp)
+diff_days=$(expr $diff_seconds / 60 / 60 / 24)
+if [ $diff_days -le 2 ]; then
+    echo "$(basename $file) CRITICAL expiration days $diff_days"
+    exit 2
+fi
+
+if [ $diff_days -le 15 ]; then
+    echo "$(basename $file) WARNING expiration days $diff_days"
+    exit 1
+fi
+
+echo "$(basename $file) OK expires on $diff_days days ($cert)"

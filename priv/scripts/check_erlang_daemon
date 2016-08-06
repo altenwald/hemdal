@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    echo "you have to specify a binary Erlang script path"
+    exit 127
+fi
+
+cd $(dirname $1)/..
+
+DAEMON="$1"
+NAME="$(basename $DAEMON)"
+PROC="$($DAEMON ping &> /dev/stdout)"
+
+if [ "$PROC" == "pong" ]; then
+    echo "$NAME OK process up"
+    exit 0
+fi
+
+echo "$NAME CRITICAL process down!"
+exit 2

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Setup standard Nagios/NRPE return codes
+#
+UNKNOWN_STATE=3
+CRITICAL_STATE=2
+WARNING_STATE=1
+OK_STATE=0
+
+case "$1" in
+    "-u"|"--update")
+        apt-get update -qq -y &> /dev/null
+        ;;
+esac
+
+TO_BE_UPDATED="$(apt-get dist-upgrade -s | grep -e ^Inst | wc -l)"
+
+if [ "$TO_BE_UPDATED" != "0" ]; then
+    echo "WARNING - packages to be updated: $TO_BE_UPDATED"
+    exit $WARNING_STATE
+fi
+
+echo "OK - all packages updated"
+exit $OK_STATE
+
