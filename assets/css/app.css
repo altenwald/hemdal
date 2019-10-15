@@ -1,0 +1,7 @@
+/* This file is for your main application css. */
+
+@import "./phoenix.css";
+
+.phx-logo img {
+  width: 75px;
+};
