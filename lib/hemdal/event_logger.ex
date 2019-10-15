@@ -8,6 +8,10 @@ defmodule Hemdal.EventLogger do
     GenStage.start_link __MODULE__, [], name: __MODULE__
   end
 
+  def stop do
+    GenStage.stop __MODULE__
+  end
+
   @impl GenStage
   def init([]) do
     state = %{

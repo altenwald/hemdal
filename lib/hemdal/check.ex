@@ -1,5 +1,5 @@
 defmodule Hemdal.Check do
-  use GenStateMachine, callback_mode: :state_functions
+  use GenStateMachine, callback_mode: :state_functions, restart: :transient
   require Logger
 
   alias Hemdal.EventManager
@@ -13,10 +13,24 @@ defmodule Hemdal.Check do
     GenStateMachine.start_link __MODULE__, [alert], name: via(alert.id)
   end
 
+  def stop(pid) when is_pid(pid) do
+    GenStateMachine.stop(pid)
+  end
+  def stop(name) do
+    GenStateMachine.stop(via(name))
+  end
+
   def exists?(name) do
     case Registry.lookup(Hemdal.Check.Registry, name) do
       [{_pid, nil}] -> true
       [] -> false
+    end
+  end
+
+  def get_pid(name) do
+    case Registry.lookup(Hemdal.Check.Registry, name) do
+      [{pid, nil}] -> pid
+      [] -> nil
     end
   end
 
@@ -27,16 +41,17 @@ defmodule Hemdal.Check do
                 end)
   end
 
-  def get_status(name) when is_binary(name) do
-    GenStateMachine.call via(name), :get_status
-  end
   def get_status(pid) when is_pid(pid) do
     GenStateMachine.call pid, :get_status
+  end
+  def get_status(name) do
+    GenStateMachine.call via(name), :get_status
   end
 
   def update_alert(alert) do
     if exists?(alert.id) do
       GenStateMachine.cast via(alert.id), {:update, alert}
+      {:ok, get_pid(alert.id)}
     else
       start(alert)
     end
@@ -230,23 +245,34 @@ defmodule Hemdal.Check do
     Logger.debug "[#{alert.id}] performing check [#{alert.name}] against " <>
                  "[#{alert.host.name}] using [#{alert.command.name}]"
     opts = [host: String.to_charlist(alert.host.name),
+            port: alert.host.port,
             user: String.to_charlist(alert.host.username),
             id_rsa: alert.host.access_key]
     command = alert.command.command
     with {:ok, trooper} <- :trooper_ssh.start(opts),
          {:ok, 0, output} <- :trooper_ssh.exec(trooper, command),
-         {:ok, %{"status" => "OK"} = data} <- Jason.decode(output) do
+         {:ok, %{"status" => "OK"} = data} <- decode(output) do
       :trooper_ssh.stop(trooper)
       Logger.debug("data: #{inspect data}")
       {:ok, data}
     else
       {:error, error} ->
         {:error, "#{inspect error}"}
+      {:ok, errorlevel, error} ->
+        {:error, %{"errorlevel" => errorlevel, "message" => error, "status" => "FAIL"}}
       {:ok, %{} = result} ->
         {:error, result}
       other ->
         Logger.error("error => #{inspect other}")
         {:error, "#{inspect other}"}
+    end
+  end
+
+  defp decode(output) do
+    case Jason.decode(output) do
+      {:ok, [status, message]} ->
+        {:ok, %{"status" => status, "description" => message}}
+      other_resp -> other_resp
     end
   end
 end

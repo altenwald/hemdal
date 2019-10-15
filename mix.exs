@@ -21,9 +21,12 @@ defmodule Hemdal.MixProject do
     [
       mod: {Hemdal.Application, []},
       extra_applications: [:logger, :runtime_tools],
-      start_phases: [load_checks: []]
+      start_phases: [load_checks: run_load_checks(Mix.env())]
     ]
   end
+
+  defp run_load_checks(:test), do: [:ignore]
+  defp run_load_checks(_), do: []
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
@@ -66,7 +69,11 @@ defmodule Hemdal.MixProject do
     [
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate", "test"]
+      test: ["ecto.drop",
+             "ecto.create",
+             "ecto.migrate",
+             "run priv/repo/seeds.exs",
+             "test --cover"]
     ]
   end
 end

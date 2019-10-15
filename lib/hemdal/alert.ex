@@ -29,4 +29,10 @@ defmodule Hemdal.Alert do
     Repo.all(Alert)
     |> Repo.preload([:host, :command])
   end
+
+  def get_by_id!(id) do
+    Alert
+    |> Repo.get!(id)
+    |> Repo.preload([:host, :command])
+  end
 end

@@ -27,7 +27,7 @@ defmodule Hemdal.Log do
   def insert(alert, status, duration, message, metadata) do
     metadata = metadata
                |> Map.put("duration", duration)
-               |> Enum.map(fn {key, value} -> {key, to_string(value)} end)
+               |> Enum.map(fn {key, value} -> {key, "#{inspect value}"} end)
                |> Enum.into(%{})
     changeset(%Log{}, %{"metadata" => metadata,
                         "status" => Atom.to_string(status),

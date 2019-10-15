@@ -8,7 +8,7 @@ defmodule Hemdal.Application do
 
   @impl Application
   def start(_type, _args) do
-    if Mix.env() != :dev do
+    if Mix.env() == :prod do
       {:ok, _} = EctoBootMigration.migrate(:hemdal)
     end
     # List all child processes to be supervised
@@ -33,6 +33,7 @@ defmodule Hemdal.Application do
   end
 
   @impl Application
+  def start_phase(:load_checks, :normal, [:ignore]), do: :ok
   def start_phase(:load_checks, :normal, []) do
     Hemdal.Alert.get_all()
     |> Enum.each(fn check ->

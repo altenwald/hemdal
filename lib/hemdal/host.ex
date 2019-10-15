@@ -10,6 +10,7 @@ defmodule Hemdal.Host do
 
   schema "hosts" do
     field :name, :string
+    field :port, :integer, default: 22
     field :access_type, :string
     field :username, :string
     field :password, :string
@@ -23,7 +24,7 @@ defmodule Hemdal.Host do
   @doc false
   def changeset(host, attrs) do
     host
-    |> cast(attrs, [:name, :access_type, :access_key, :access_pub])
-    |> validate_required([:name, :access_type, :access_key, :access_pub])
+    |> cast(attrs, [:name, :port, :access_type, :access_key, :access_pub])
+    |> validate_required([:name, :port, :access_type, :access_key, :access_pub])
   end
 end
