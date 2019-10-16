@@ -52,6 +52,7 @@ defmodule Hemdal.MixProject do
       {:plug_cowboy, "~> 2.0"},
       {:tesla, "~> 1.1.0"},
       {:trooper, "~> 0.3.0"},
+      {:timex, "~> 3.6"},
 
       # for releases
       {:distillery, "~> 2.0"},

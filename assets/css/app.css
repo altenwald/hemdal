@@ -5,3 +5,7 @@
 .phx-logo img {
   width: 75px;
 };
+
+.container {
+  max-width: 90%;
+}

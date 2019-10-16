@@ -1,19 +1,23 @@
-<table class="table">
+<table class="table" id="alerts">
   <thead>
     <th>Status</th>
     <th>Host</th>
+    <th>Command</th>
     <th>Description</th>
+    <th>Last Update (UTC)</th>
   </thead>
   <tbody>
   <%= for notif <- @notifications do %>
-  <tr class="<%= status_class(notif["status"]) %>">
-    <td><%= show_status(notif["status"]) %></td>
-    <td><%= notif["alert"]["host"] %></td>
+  <tr class="<%= status_class(notif["status"]) %>" id="alert-<%= notif["alert"]["id"] %>">
+    <td class="status"><%= show_status(notif["status"]) %></td>
+    <td class="host"><%= notif["alert"]["host"] %></td>
+    <td class="command"><%= notif["alert"]["command"] %></td>
     <%= if notif["status"] == :ok do %>
-    <td><%= notif["result"]["description"] %></td>
+    <td class="description"><%= notif["result"]["description"] %></td>
     <% else %>
-    <td><%= notif["result"] %></td>
+    <td class="description"><%= notif["result"] %></td>
     <% end %>
+    <td class="last-update"><%= Timex.format!(notif["last_update"], "%F %R", :strftime) %></td>
   </tr>
   <% end %>
   </tbody>

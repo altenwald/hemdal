@@ -55,9 +55,42 @@ let socket = new Socket("/socket", {params: {token: window.userToken}})
 socket.connect()
 
 // Now that you are connected, you can join channels with a topic:
-let channel = socket.channel("topic:subtopic", {})
+let channel = socket.channel("checks:all", {})
 channel.join()
   .receive("ok", resp => { console.log("Joined successfully", resp) })
   .receive("error", resp => { console.log("Unable to join", resp) })
+
+function show_status(status) {
+  switch (status) {
+    case "ok": return "OK";
+    case "warn": return "WARN";
+    case "error": return "FAIL";
+  }
+}
+
+function status_class(status) {
+  switch (status) {
+    case "ok": return "sucess";
+    case "warn": return "warn";
+    case "error": return "danger";
+  }
+}
+
+channel.on("event", payload => {
+  console.log(payload);
+  if (!$("#alert-" + payload.alert.id).html()) {
+    $("#alerts").append("<tr id='alert-" + payload.alert.id + "'><td class='status'></td><td class='host'></td><td class='description'></td><td class='last-update'></td></tr>")
+  }
+  $("#alert-" + payload.alert.id).attr("class", status_class(payload.status));
+  $("#alert-" + payload.alert.id + " .status").html(show_status(payload.status));
+  $("#alert-" + payload.alert.id + " .host").html(payload.alert.host);
+  $("#alert-" + payload.alert.id + " .command").html(payload.alert.command);
+  if (payload.status == "ok") {
+    $("#alert-" + payload.alert.id + " .description").html(payload.result.description);
+  } else {
+    $("#alert-" + payload.alert.id + " .description").html(payload.result);
+  }
+  $("#alert-" + payload.alert.id + " .last-update").html(payload.last_update);
+});
 
 export default socket

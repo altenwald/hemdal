@@ -10,8 +10,11 @@ import css from "../css/app.css"
 // Import dependencies
 //
 import "phoenix_html"
+import $ from 'jquery';
+window.jQuery = $;
+window.$ = $;
 
 // Import local files
 //
 // Local files can be imported directly using relative paths, for example:
-// import socket from "./socket"
+import socket from "./socket"

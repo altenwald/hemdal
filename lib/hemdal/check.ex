@@ -64,6 +64,7 @@ defmodule Hemdal.Check do
     defstruct alert: nil,
               status: nil,
               retries: 0,
+              last_update: NaiveDateTime.utc_now(),
               time_to_check: @time_to_check,
               time_to_check_broken: @time_to_check_broken,
               fail_started: nil
@@ -75,7 +76,8 @@ defmodule Hemdal.Check do
 
   @impl GenStateMachine
   def init([alert]) do
-    state = %State{alert: alert}
+    state = %State{alert: alert,
+                   last_update: NaiveDateTime.utc_now()}
     ## FIXME retrieve initial state name from alert (logs)
     {:ok, :normal, state, [{:next_event, :state_timeout, :check}]}
   end
@@ -85,19 +87,27 @@ defmodule Hemdal.Check do
     {:ok, state_name, state_data}
   end
 
-  def normal({:call, from}, :get_status,
-             %State{alert: alert, status: status}) do
-    reply = %{"status" => :ok,
-              "alert" => %{
-                "name" => alert.name,
-                "host" => alert.host.name,
-                "command" => alert.command.name
-              },
-              "result" => status}
+  defp build_reply(type, %State{alert: alert, status: status} = state) do
+    %{
+      "status" => type,
+      "alert" => %{
+        "id" => alert.id,
+        "name" => alert.name,
+        "host" => alert.host.name,
+        "command" => alert.command.name
+      },
+      "last_update" => state.last_update,
+      "result" => status
+    }
+  end
+
+  def normal({:call, from}, :get_status, state) do
+    reply = build_reply(:ok, state)
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
   def normal(:cast, {:update, alert}, state) do
-    {:keep_state, %State{state | alert: alert}}
+    {:keep_state, %State{state | alert: alert,
+                                 last_update: NaiveDateTime.utc_now()}}
   end
   def normal(:state_timeout, :check, %State{alert: alert} = state) do
     case perform_check(alert) do
@@ -106,21 +116,26 @@ defmodule Hemdal.Check do
                               status: :ok,
                               prev_status: :ok,
                               fail_started: 0,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: status})
         actions = [{:state_timeout, state.time_to_check, :check}]
-        {:keep_state, %State{state | status: status}, actions}
+        state = %State{state | status: status,
+                               last_update: NaiveDateTime.utc_now()}
+        {:keep_state, state, actions}
       {:error, error} ->
         EventManager.notify(%{alert: alert,
                               status: :warn,
                               prev_status: :ok,
                               fail_started: 0,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: %{"error" => error}})
         Logger.warn "[#{alert.id}] starting to fail [#{alert.name}] for " <>
                     "[#{alert.host.name}]: #{inspect error}"
         timeout = alert.recheck_in_sec * 1_000
         state = %State{state | status: error,
                                retries: alert.retries,
-                               fail_started: NaiveDateTime.utc_now()}
+                               fail_started: NaiveDateTime.utc_now(),
+                               last_update: NaiveDateTime.utc_now()}
         actions = [{:state_timeout, timeout, :check}]
         {:next_state, :failing, state, actions}
     end
@@ -130,15 +145,8 @@ defmodule Hemdal.Check do
     NaiveDateTime.diff(NaiveDateTime.utc_now(), previous)
   end
 
-  def failing({:call, from}, :get_status,
-              %State{alert: alert, status: status}) do
-    reply = %{"status" => :warn,
-              "alert" => %{
-                "name" => alert.name,
-                "host" => alert.host.name,
-                "command" => alert.command.name
-              },
-              "result" => status}
+  def failing({:call, from}, :get_status, state) do
+    reply = build_reply(:warn, state)
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
   def failing(:cast, {:update, alert}, state) do
@@ -154,9 +162,11 @@ defmodule Hemdal.Check do
                               status: :ok,
                               prev_status: :warn,
                               fail_started: t,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: status})
         actions = [{:state_timeout, state.time_to_check, :check}]
-        state = %State{state | status: status}
+        state = %State{state | status: status,
+                               last_update: NaiveDateTime.utc_now()}
         {:next_state, :normal, state, actions}
       {:error, error} ->
         t = ellapsed(state.fail_started)
@@ -164,12 +174,14 @@ defmodule Hemdal.Check do
                               status: :error,
                               prev_status: :warn,
                               fail_started: t,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: %{"error" => error}})
         Logger.error "[#{alert.id}] confirmed fail [#{alert.name}]" <>
                      " for [#{alert.host.name}] " <>
                      "[#{ellapsed(state.fail_started)} sec]"
         actions = [{:state_timeout, state.time_to_check_broken, :check}]
-        state = %State{state | status: error}
+        state = %State{state | status: error,
+                               last_update: NaiveDateTime.utc_now()}
         {:next_state, :broken, state, actions}
     end
   end
@@ -181,9 +193,11 @@ defmodule Hemdal.Check do
                               status: :ok,
                               prev_status: :warn,
                               fail_started: t,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: status})
         actions = [{:state_timeout, state.time_to_check, :check}]
-        state = %State{state | status: status}
+        state = %State{state | status: status,
+                               last_update: NaiveDateTime.utc_now()}
         {:next_state, :normal, state, actions}
       {:error, error} ->
         t = ellapsed(state.fail_started)
@@ -191,27 +205,23 @@ defmodule Hemdal.Check do
                               status: :warn,
                               prev_status: :warn,
                               fail_started: t,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: %{"error" => error}})
         timeout = alert.recheck_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
-        state = %State{state | retries: state.retries - 1}
+        state = %State{state | retries: state.retries - 1,
+                               last_update: NaiveDateTime.utc_now()}
         {:keep_state, state, actions}
     end
   end
 
-  def broken({:call, from}, :get_status,
-             %State{alert: alert, status: status}) do
-    reply = %{"status" => :error,
-              "alert" => %{
-                "name" => alert.name,
-                "host" => alert.host.name,
-                "command" => alert.command.name
-              },
-              "result" => status}
+  def broken({:call, from}, :get_status, state) do
+    reply = build_reply(:error, state)
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
   def broken(:cast, {:update, alert}, state) do
-    {:keep_state, %State{state | alert: alert}}
+    {:keep_state, %State{state | alert: alert,
+                                 last_update: NaiveDateTime.utc_now()}}
   end
   def broken(:state_timeout, :check, %State{alert: alert} = state) do
     case perform_check(alert) do
@@ -221,12 +231,14 @@ defmodule Hemdal.Check do
                               status: :ok,
                               prev_status: :error,
                               fail_started: t,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: status})
         Logger.info "[#{alert.id}] recover [#{alert.name}] for " <>
                     "[#{alert.host.name}] " <>
                     "[#{ellapsed(state.fail_started)} sec]"
         actions = [{:state_timeout, state.time_to_check, :check}]
-        state = %State{state | status: status}
+        state = %State{state | status: status,
+                               last_update: NaiveDateTime.utc_now()}
         {:next_state, :normal, state, actions}
       {:error, error} ->
         t = ellapsed(state.fail_started)
@@ -234,9 +246,11 @@ defmodule Hemdal.Check do
                               status: :error,
                               prev_status: :error,
                               fail_started: t,
+                              last_update: NaiveDateTime.utc_now(),
                               metadata: %{"error" => error}})
         actions = [{:state_timeout, state.time_to_check_broken, :check}]
-        state = %State{state | status: error}
+        state = %State{state | status: error,
+                               last_update: NaiveDateTime.utc_now()}
         {:keep_state, state, actions}
     end
   end

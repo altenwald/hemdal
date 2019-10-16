@@ -1,8 +1,8 @@
-defmodule HemdalWeb.UserSocket do
+defmodule HemdalWeb.CheckSocket do
   use Phoenix.Socket
 
   ## Channels
-  # channel "room:*", HemdalWeb.RoomChannel
+  channel "checks:*", Hemdal.CheckChannel
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After

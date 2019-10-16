@@ -21,6 +21,8 @@ defmodule Hemdal.Application do
       Hemdal.EventManager,
       # Start the event loggger
       Hemdal.EventLogger,
+      # Start the event channel
+      Hemdal.EventChannel,
       # Start the registry and sup to content the checks (based on database UUID)
       {Registry, keys: :unique, name: Hemdal.Check.Registry},
       {DynamicSupervisor, strategy: :one_for_one, name: Hemdal.Check.Supervisor},

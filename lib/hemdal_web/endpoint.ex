@@ -1,7 +1,7 @@
 defmodule HemdalWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :hemdal
 
-  socket "/socket", HemdalWeb.UserSocket,
+  socket "/socket", HemdalWeb.CheckSocket,
     websocket: true,
     longpoll: false
 
