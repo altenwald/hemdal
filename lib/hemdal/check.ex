@@ -37,8 +37,11 @@ defmodule Hemdal.Check do
   def get_all do
     DynamicSupervisor.which_children(Hemdal.Check.Supervisor)
     |> Enum.map(fn {_, pid, _, _} ->
-                  GenStateMachine.call(pid, :get_status)
+                  Task.async(fn ->
+                    GenStateMachine.call(pid, :get_status)
+                  end)
                 end)
+    |> Enum.map(&(Task.await(&1)))
   end
 
   def get_status(pid) when is_pid(pid) do
