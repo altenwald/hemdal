@@ -56,7 +56,7 @@ defmodule Hemdal.MixProject do
 
       # for releases
       {:distillery, "~> 2.0"},
-      {:ecto_boot_migration, "~> 0.1.1"},
+      {:ecto_boot_migration, "~> 0.2.0"},
     ]
   end
 
