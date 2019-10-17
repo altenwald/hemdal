@@ -3,7 +3,6 @@ defmodule Hemdal.EventNotif do
   require Logger
 
   alias Hemdal.AlertNotif
-  alias Hemdal.Api.Slack
 
   @event_manager Hemdal.EventManager
 
@@ -89,7 +88,8 @@ defmodule Hemdal.EventNotif do
                     "icon_emoji" => icon,
                     "channel" => channel,
                     "attachments" => atts}
-        Slack.send(message, notif.token)
+        notif_mod = Module.concat([Hemdal.Api, notif.type])
+        apply(notif_mod, :send, [message, notif.token])
       end
     end)
     {:noreply, [], state}
