@@ -9,6 +9,7 @@ defmodule Hemdal.Alert do
   @derive {Phoenix.Param, key: :id}
 
   schema "alerts" do
+    field :enabled, :boolean, default: true
     field :name, :string
     field :recheck_in_sec, :integer, default: 5
     field :retries, :integer, default: 3

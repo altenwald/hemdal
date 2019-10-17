@@ -74,6 +74,7 @@ defmodule Hemdal.MixProject do
              "ecto.create",
              "ecto.migrate",
              "run priv/repo/seeds.exs",
+             "run priv/repo/test_seeds.exs",
              "test --cover"]
     ]
   end

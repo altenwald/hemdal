@@ -90,7 +90,11 @@ defmodule Hemdal.Check do
     state = %State{alert: alert,
                    last_update: NaiveDateTime.utc_now()}
     ## FIXME retrieve initial state name from alert (logs)
-    {:ok, :normal, state, [{:next_event, :state_timeout, :check}]}
+    if alert.enabled do
+      {:ok, :normal, state, [{:next_event, :state_timeout, :check}]}
+    else
+      {:ok, :disabled, state}
+    end
   end
 
   @impl GenStateMachine
@@ -112,9 +116,33 @@ defmodule Hemdal.Check do
     }
   end
 
+  def disabled({:call, from}, :get_status, state) do
+    reply = build_reply(:disabled, state)
+    {:keep_state_and_data, [{:reply, from, reply}]}
+  end
+  def disabled(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+    state = %State{state | alert: alert, last_update: NaiveDateTime.utc_now()}
+    {:keep_state, state}
+  end
+  def disabled(:cast, {:update, alert}, state) do
+    state = %State{state | alert: alert}
+    actions = [{:next_event, :state_timeout, :check}]
+    {:next_state, :normal, state, actions}
+  end
+
   def normal({:call, from}, :get_status, state) do
     reply = build_reply(:ok, state)
     {:keep_state_and_data, [{:reply, from, reply}]}
+  end
+  def normal(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+    state = %State{state | alert: alert, last_update: NaiveDateTime.utc_now()}
+    EventManager.notify(%{alert: alert,
+                          status: :disabled,
+                          prev_status: :ok,
+                          fail_started: 0,
+                          last_update: NaiveDateTime.utc_now(),
+                          metadata: "disabled"})
+    {:next_state, :disabled, state}
   end
   def normal(:cast, {:update, alert}, state) do
     {:keep_state, %State{state | alert: alert,
@@ -159,6 +187,17 @@ defmodule Hemdal.Check do
   def failing({:call, from}, :get_status, state) do
     reply = build_reply(:warn, state)
     {:keep_state_and_data, [{:reply, from, reply}]}
+  end
+  def failing(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+    state = %State{state | alert: alert, last_update: NaiveDateTime.utc_now()}
+    t = ellapsed(state.fail_started)
+    EventManager.notify(%{alert: alert,
+                          status: :disabled,
+                          prev_status: :warn,
+                          fail_started: t,
+                          last_update: NaiveDateTime.utc_now(),
+                          metadata: "disabled"})
+    {:next_state, :disabled, state}
   end
   def failing(:cast, {:update, alert}, state) do
     {:keep_state, %State{state | alert: alert}}
@@ -229,6 +268,17 @@ defmodule Hemdal.Check do
   def broken({:call, from}, :get_status, state) do
     reply = build_reply(:error, state)
     {:keep_state_and_data, [{:reply, from, reply}]}
+  end
+  def broken(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+    state = %State{state | alert: alert, last_update: NaiveDateTime.utc_now()}
+    t = ellapsed(state.fail_started)
+    EventManager.notify(%{alert: alert,
+                          status: :disabled,
+                          prev_status: :error,
+                          fail_started: t,
+                          last_update: NaiveDateTime.utc_now(),
+                          metadata: "disabled"})
+    {:next_state, :disabled, state}
   end
   def broken(:cast, {:update, alert}, state) do
     {:keep_state, %State{state | alert: alert,

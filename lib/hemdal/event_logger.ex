@@ -35,6 +35,7 @@ defmodule Hemdal.EventLogger do
   def process_event(%{alert: alert, fail_started: duration, status: status,
                       metadata: metadata, prev_status: prev}, state) do
     message = case {status, prev} do
+      {:disabled, _} -> "disabled #{alert.name} on #{alert.host.name}"
       {:ok, :ok} -> "sucessful run #{alert.name} on #{alert.host.name}"
       {:ok, :warn} -> "sucessful again run #{alert.name} on #{alert.host.name} after #{duration} sec"
       {:ok, :error} -> "recovered run #{alert.name} on #{alert.host.name} after #{duration} sec"
