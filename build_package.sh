@@ -8,4 +8,4 @@ cd assets
 npm i
 node node_modules/webpack/bin/webpack.js --mode production
 cd ..
-mix do phx.digest, release --upgrade --env=prod
+mix do phx.digest, distillery.release --upgrade --env=prod
