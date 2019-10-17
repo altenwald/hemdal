@@ -13,8 +13,12 @@ config :hemdal,
 # which you should run after static files are built and
 # before starting your production server.
 config :hemdal, HemdalWeb.Endpoint,
-  url: [host: "example.com", port: 80],
-  cache_static_manifest: "priv/static/cache_manifest.json"
+  http: [ip: {127, 0, 0, 1}, port: {:system, "PORT"}],
+  url: [host: "${DOMAIN}", port: {:system, "PORT"}],
+  cache_static_manifest: "priv/static/cache_manifest.json",
+  server: true,
+  root: ".",
+  version: Application.spec(:phoenix_distillery, :vsn)
 
 # Do not print debug messages in production
 config :logger, level: :info
@@ -53,6 +57,16 @@ config :logger, level: :info
 #
 # Check `Plug.SSL` for all available options in `force_ssl`.
 
-# Finally import the config/prod.secret.exs which loads secrets
-# and configuration from environment variables.
-import_config "prod.secret.exs"
+config :altenwaldbooks, :admin_auth,
+  username: "${ADMIN_USER}",
+  password: "${ADMIN_PASS}",
+  realm: "Hemdal Alert/Alarms Panel"
+
+# Configure your database
+config :hemdal, Hemdal.Repo,
+  adapter: Ecto.Adapters.Postgres,
+  username: "${POSTGRES_USER}",
+  password: "${POSTGRES_PASS}",
+  database: "${POSTGRES_DATABASE}",
+  hostname: "${POSTGRES_HOSTNAME}",
+  pool_size: 10
