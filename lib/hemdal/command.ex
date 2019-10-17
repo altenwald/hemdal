@@ -11,6 +11,7 @@ defmodule Hemdal.Command do
   schema "commands" do
     field :command, :string
     field :name, :string
+    field :command_type, :string
 
     has_many :alerts, Alert
     timestamps()

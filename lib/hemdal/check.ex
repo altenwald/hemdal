@@ -2,7 +2,10 @@ defmodule Hemdal.Check do
   use GenStateMachine, callback_mode: :state_functions, restart: :transient
   require Logger
 
-  alias Hemdal.EventManager
+  @temporal_dir "/tmp"
+  @default_shell "/bin/bash"
+
+  alias Hemdal.{Alert, Command, EventManager}
 
   def start(alert) do
     DynamicSupervisor.start_child Hemdal.Check.Supervisor,
@@ -32,6 +35,11 @@ defmodule Hemdal.Check do
       [{pid, nil}] -> pid
       [] -> nil
     end
+  end
+
+  def reload_all do
+    Alert.get_all()
+    |> Enum.each(&(update_alert(&1)))
   end
 
   def get_all do
@@ -265,20 +273,24 @@ defmodule Hemdal.Check do
             port: alert.host.port,
             user: String.to_charlist(alert.host.username),
             id_rsa: alert.host.access_key]
-    command = alert.command.command
-    with {:ok, trooper} <- :trooper_ssh.start(opts),
-         {:ok, 0, output} <- :trooper_ssh.exec(trooper, command),
-         {:ok, %{"status" => "OK"} = data} <- decode(output) do
-      :trooper_ssh.stop(trooper)
-      Logger.debug("data: #{inspect data}")
-      {:ok, data}
-    else
-      {:error, error} ->
-        {:error, "#{inspect error}"}
+    result = :trooper_ssh.transaction(opts, fn(trooper) ->
+      with {:ok, 0, output} <- exec_cmd(trooper, alert),
+           {:ok, %{"status" => "OK"} = data} <- decode(output) do
+        :trooper_ssh.stop(trooper)
+        Logger.debug("data: #{inspect data}")
+        {:ok, data}
+      else
+        other -> other
+      end
+    end)
+    case result do
+      {:ok, %{"status" => "OK"} = data} -> {:ok, data}
+      {:error, error} -> {:error, "#{inspect error}"}
+      {:ok, %{} = result} -> {:error, result}
       {:ok, errorlevel, error} ->
-        {:error, %{"errorlevel" => errorlevel, "message" => error, "status" => "FAIL"}}
-      {:ok, %{} = result} ->
-        {:error, result}
+        {:error, %{"errorlevel" => errorlevel,
+                   "message" => error,
+                   "status" => "FAIL"}}
       other ->
         Logger.error("error => #{inspect other}")
         {:error, "#{inspect other}"}
@@ -290,6 +302,31 @@ defmodule Hemdal.Check do
       {:ok, [status, message]} ->
         {:ok, %{"status" => status, "description" => message}}
       other_resp -> other_resp
+    end
+  end
+
+  defp random_string do
+    Integer.to_string(:rand.uniform(0x100000000), 36) |> String.downcase
+  end
+
+  defp exec_cmd(trooper, %Alert{command: %Command{command_type: "line",
+                                                  command: command}}) do
+    :trooper_ssh.exec(trooper, command)
+  end
+  defp exec_cmd(trooper, %Alert{command: %Command{command_type: "script",
+                                                  command: script},
+                                command_args: args}) do
+    tmp_file = Path.join([@temporal_dir, random_string()])
+    try do
+      sh = case String.split(script, ["\n"], trim: true) do
+        "#!" <> shell -> shell
+        _ -> @default_shell
+      end
+      :trooper_scp.write_file(trooper, tmp_file, script)
+      cmd = Enum.join([sh, tmp_file|args], " ")
+      :trooper_ssh.exec(trooper, cmd)
+    after
+      :trooper_scp.delete(trooper, tmp_file)
     end
   end
 end

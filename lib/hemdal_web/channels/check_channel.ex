@@ -1,8 +1,6 @@
 defmodule Hemdal.CheckChannel do
   use Phoenix.Channel
 
-  alias Hemdal.Check
-
   def join("checks:all", _params, socket) do
     {:ok, socket}
   end

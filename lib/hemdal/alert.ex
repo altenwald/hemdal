@@ -2,7 +2,7 @@ defmodule Hemdal.Alert do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Hemdal.{Host, Command, Alert, Repo}
+  alias Hemdal.{Repo, Host, Command, Alert}
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -12,6 +12,7 @@ defmodule Hemdal.Alert do
     field :name, :string
     field :recheck_in_sec, :integer, default: 5
     field :retries, :integer, default: 3
+    field :command_args, {:array, :string}, default: []
 
     belongs_to :host, Host
     belongs_to :command, Command

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+UNKNOWN_STATE=3
+CRITICAL_STATE=2
+WARNING_STATE=1
+OK_STATE=0
+
+if [ -z "$1" ]; then
+    echo "you have to specify a file"
+    exit $UNKNOWN_STATE
+fi
+
+file=$1
+cert=$(openssl x509 -noout -text -in "$file" | grep "Not After" | sed -e 's#^.*Not After *: ##')
+cert_timestamp=$(date --date="$cert" +%s)
+fmt_date=$(date --date="$cert" "+%Y-%m-%d")
+now_timestamp=$(date +%s)
+diff_seconds=$(expr $cert_timestamp - $now_timestamp)
+diff_days=$(expr $diff_seconds / 60 / 60 / 24)
+if [ $diff_days -le 2 ]; then
+    echo "[\"FAIL\", \"$(basename $file) expires in $diff_days days ($fmt_date)\"]"
+    exit $CRITICAL_STATE
+fi
+
+if [ $diff_days -le 15 ]; then
+    echo "[\"WARN\", \"$(basename $file) expires in $diff_days days ($fmt_date)\"]"
+    exit $WARNING_STATE
+fi
+
+echo "[\"OK\", \"$(basename $file) expires in $diff_days days ($fmt_date)\"]"
+exit $OK_STATE

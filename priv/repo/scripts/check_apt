@@ -1,0 +1,26 @@
+#!/bin/bash
+
+UNKNOWN_STATE=3
+CRITICAL_STATE=2
+WARNING_STATE=1
+OK_STATE=0
+
+case "$1" in
+    "-u"|"--update")
+        apt-get update -qq -y &> /dev/null
+        ;;
+esac
+
+if [ -x aptitude ]; then
+    TO_BE_UPDATED="$(aptitude search '~U' 2>/dev/null | wc -l)"
+else
+    TO_BE_UPDATED="$(apt-get dist-upgrade -s 2>/dev/null | grep -e ^Inst | wc -l)"
+fi
+
+if [ "$TO_BE_UPDATED" != "0" ]; then
+    echo "[\"WARN\", \"packages to be updated: $TO_BE_UPDATED\"]"
+    exit $WARNING_STATE
+fi
+
+echo "[\"OK\", \"all packages updated\"]"
+exit $OK_STATE
