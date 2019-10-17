@@ -33,7 +33,11 @@ defmodule Hemdal.EventChannel do
         "id" => alert.id,
         "name" => alert.name,
         "host" => alert.host.name,
-        "command" => alert.command.name
+        "command" => alert.command.name,
+        "group" => %{
+          "id" => alert.group.id,
+          "name" => alert.group.name
+        }
       },
       "last_update" => Timex.format!(last_update, "%F %R", :strftime),
       "result" => status

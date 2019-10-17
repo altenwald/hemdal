@@ -1,4 +1,6 @@
-<table class="table" id="alerts">
+<%= for {group, notifications} <- Enum.group_by(@notifications, &(&1["alert"]["group"])) do %>
+<h1><%= group["name"] %></h1>
+<table class="table" id="alerts-group-<%= group["id"] %>">
   <thead>
     <th>Status</th>
     <th>Host</th>
@@ -7,14 +9,17 @@
     <th>Last Update (UTC)</th>
   </thead>
   <tbody>
-  <%= for notif <- @notifications do %>
+  <%= for notif <- notifications do %>
   <tr class="<%= status_class(notif["status"]) %>" id="alert-<%= notif["alert"]["id"] %>">
     <td class="status"><%= show_status(notif["status"]) %></td>
     <td class="host"><%= notif["alert"]["host"] %></td>
     <td class="command"><%= notif["alert"]["command"] %></td>
-    <%= if notif["status"] == :ok do %>
+    <%= cond do %>
+    <% notif["status"] == :ok or notif["result"]["description"] != nil -> %>
     <td class="description"><%= notif["result"]["description"] %></td>
-    <% else %>
+    <% notif["result"]["message"] != nil -> %>
+    <td class="description"><%= notif["result"]["message"] %></td>
+    <% true -> %>
     <td class="description"><%= notif["result"] %></td>
     <% end %>
     <td class="last-update"><%= Timex.format!(notif["last_update"], "%F %R", :strftime) %></td>
@@ -22,3 +27,4 @@
   <% end %>
   </tbody>
 </table>
+<% end %>

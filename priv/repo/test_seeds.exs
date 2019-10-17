@@ -15,6 +15,12 @@ alias Hemdal.{Repo, Alert, Host, Command, Group}
 alert_id = "aea48656-be08-4576-a2d0-2723458faefd"
 host_id = UUID.uuid4()
 command_id = UUID.uuid4()
+group_id = UUID.uuid4()
+
+Repo.insert!(%Group{
+  id: group_id,
+  name: "Testing"
+})
 
 Repo.insert!(%Host{
   id: host_id,
@@ -39,6 +45,7 @@ Repo.insert!(%Alert{
   name: "valid alert check",
   host_id: host_id,
   command_id: command_id,
+  group_id: group_id,
   recheck_in_sec: 1,
   retries: 1
 })
@@ -70,6 +77,7 @@ Repo.insert!(%Alert{
   name: "invalid alert check",
   host_id: host_id,
   command_id: command_id,
+  group_id: group_id,
   recheck_in_sec: 1,
   retries: 1
 })

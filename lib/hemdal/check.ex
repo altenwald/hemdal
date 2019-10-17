@@ -109,7 +109,11 @@ defmodule Hemdal.Check do
         "id" => alert.id,
         "name" => alert.name,
         "host" => alert.host.name,
-        "command" => alert.command.name
+        "command" => alert.command.name,
+        "group" => %{
+          "name" => alert.group.name,
+          "id" => alert.group_id,
+        }
       },
       "last_update" => state.last_update,
       "result" => status
