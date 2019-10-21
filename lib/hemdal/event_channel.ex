@@ -32,7 +32,7 @@ defmodule Hemdal.EventChannel do
       "alert" => %{
         "id" => alert.id,
         "name" => alert.name,
-        "host" => alert.host.name,
+        "host" => alert.host.description || alert.host.name,
         "command" => alert.command.name,
         "group" => %{
           "id" => alert.group.id,
