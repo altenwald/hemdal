@@ -1,0 +1,34 @@
+#!/bin/bash
+
+UNKNOWN_STATE=3
+CRITICAL_STATE=2
+WARNING_STATE=1
+OK_STATE=0
+
+CONTAINER_NAME="$1"
+PROCESS_NAME="$2"
+
+if [ -z "$CONTAINER_NAME" ]; then
+    echo '["UNKNOWN", "missing container name"]'
+    exit $UNKNOWN_STATE
+fi
+
+if [ -z "$PROCESS_NAME" ]; then
+    echo '["UNKNOWN", "missing param for command name in script"]'
+    exit $UNKNOWN_STATE
+fi
+
+STATUS="$(docker inspect -f '{{.State.Status}}' $CONTAINER_NAME 2>/dev/null)"
+if [ "$STATUS" != "running" ]; then
+    echo '["FAIL", "container down!"]'
+    exit $CRITICAL_STATE
+fi
+
+PROCESS="$(docker top $CONTAINER_NAME o pid,cmd | grep $PROCESS_NAME)"
+if [ -z "$PROCESS" ]; then
+    echo "[\"WARN\", \"process $PROCESS_NAME not running\"]"
+    exit $WARNING_STATE
+fi
+
+echo "[\"OK\", \"$PROCESS_NAME running in $CONTAINER_NAME\"]"
+exit $OK_STATE
