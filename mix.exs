@@ -4,7 +4,7 @@ defmodule Hemdal.MixProject do
   def project do
     [
       app: :hemdal,
-      version: "0.3.0",
+      version: "0.3.1",
       elixir: "~> 1.8",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),

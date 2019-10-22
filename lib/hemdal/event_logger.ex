@@ -14,26 +14,24 @@ defmodule Hemdal.EventLogger do
 
   @impl GenStage
   def init([]) do
-    state = %{
-      log_all_events: Application.get_env(:hemdal, :log_all_events, false),
-    }
+    state = %{log_level: Application.get_env(:hemdal, :log_level, "warn")}
     {:consumer, state, subscribe_to: [@event_manager]}
   end
 
   @impl true
   def handle_events(events, _from, state) do
-    List.foldl(events, {:noreply, [], state},
-               fn event, {:noreply, [], state} -> process_event(event, state)
-                  _event, result -> result
-               end)
-  end
-
-  def process_event(%{status: status, prev_status: status},
-                    %{log_all_events: false} = state) do
+    Enum.each(events, &(process_event(&1, state.log_level)))
     {:noreply, [], state}
   end
+
+  def process_event(%{status: status, prev_status: prev}, "error")
+    when not(status == "FAIL" and prev != "FAIL") and
+         not(status != "FAIL" and prev == "FAIL") do
+    :ok
+  end
+  def process_event(%{status: status, prev_status: status}, "warn"), do: :ok
   def process_event(%{alert: alert, fail_started: duration, status: status,
-                      metadata: metadata, prev_status: prev}, state) do
+                      metadata: metadata, prev_status: prev}, _log_level) do
     message = case {status, prev} do
       {:disabled, _} -> "disabled #{alert.name} on #{alert.host.name}"
       {:ok, :ok} -> "sucessful run #{alert.name} on #{alert.host.name}"
@@ -50,6 +48,6 @@ defmodule Hemdal.EventLogger do
       :error -> Logger.error message
     end
     Hemdal.Log.insert alert, status, duration, message, metadata
-    {:noreply, [], state}
+    :ok
   end
 end

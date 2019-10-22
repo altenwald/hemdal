@@ -43,6 +43,11 @@ defmodule Hemdal.EventNotif do
   defp to_color(:disabled), do: "#888888"
   defp to_color(_), do: "#444444"
 
+  defp check_log_level("debug", _, _), do: true
+  defp check_log_level("error", "FAIL", status) when status != "FAIL", do: true
+  defp check_log_level("error", prev, "FAIL") when prev != "FAIL", do: true
+  defp check_log_level("warn", prev, status) when prev != status, do: true
+
   def process_event(%{alert: alert, fail_started: duration, status: status,
                       metadata: metadata, prev_status: prev}, state) do
     message = case {status, prev} do
@@ -56,7 +61,7 @@ defmodule Hemdal.EventNotif do
       {:error, :error} -> "still broken #{alert.name} on #{alert.host.name} lasting #{duration} sec"
     end
     Enum.each(alert.alert_notifs, fn %AlertNotif{notif: notif} = alert_notif ->
-      if alert_notif.log_all_events or status != prev do
+      if check_log_level(alert_notif.log_level, prev, status) do
         username = iff(notif.username, @default_username)
         icon = iff(notif.metadata["icon"], @default_icon)
         desc = iff(metadata["message"], "<no description>")
