@@ -44,9 +44,21 @@ defmodule Hemdal.EventNotif do
   defp to_color(_), do: "#444444"
 
   defp check_log_level("debug", _, _), do: true
-  defp check_log_level("error", "FAIL", status) when status != "FAIL", do: true
-  defp check_log_level("error", prev, "FAIL") when prev != "FAIL", do: true
-  defp check_log_level("warn", prev, status) when prev != status, do: true
+  defp check_log_level("error", :error, status) when status != :error, do: true
+  defp check_log_level("error", prev, :error) when prev != :error, do: true
+  defp check_log_level("error", _prev, _status), do: false
+  defp check_log_level("warn", prev, status), do: prev != status
+  defp check_log_level(level, prev, status) do
+    raise """
+          \n*******
+          ERROR! The value for level (#{inspect level}) isn't valid!
+          Check it out in your configuration and set: "warn", "error" or
+          "debug".
+
+          Previous status: #{prev}
+          New status: #{status}
+          """
+  end
 
   def process_event(%{alert: alert, fail_started: duration, status: status,
                       metadata: metadata, prev_status: prev}, state) do
