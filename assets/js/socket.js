@@ -79,7 +79,7 @@ function status_class(status) {
 channel.on("event", payload => {
   console.log(payload);
   if (!$("#alert-" + payload.alert.id).html()) {
-    $("#alerts-group-" + payload.alert.group.id).append("<tr id='alert-" + payload.alert.id + "'><td class='status'></td><td class='host'></td><td class='command'></td><td class='description'></td><td class='last-update'></td></tr>")
+    $("#alerts-group-" + payload.alert.group.id).append("<tr id='alert-" + payload.alert.id + "'><td class='status'></td><td class='host'></td><td class='name'></td><td class='message'></td><td class='last-update'></td></tr>")
   }
   $("#alert-" + payload.alert.id).attr("class", status_class(payload.status));
   $("#alert-" + payload.alert.id + " .status").html(show_status(payload.status));
