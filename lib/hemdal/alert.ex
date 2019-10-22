@@ -11,7 +11,9 @@ defmodule Hemdal.Alert do
   schema "alerts" do
     field :enabled, :boolean, default: true
     field :name, :string
+    field :check_in_sec, :integer, default: 60
     field :recheck_in_sec, :integer, default: 5
+    field :broken_recheck_in_sec, :integer, default: 30
     field :retries, :integer, default: 3
     field :command_args, {:array, :string}, default: []
 
@@ -22,7 +24,8 @@ defmodule Hemdal.Alert do
     timestamps()
   end
 
-  @optional_fields [:recheck_in_sec, :retries]
+  @optional_fields [:check_in_sec, :recheck_in_sec, :retries,
+                    :broken_recheck_in_sec]
   @required_fields [:name, :command_id, :host_id, :group_id]
 
   @doc false

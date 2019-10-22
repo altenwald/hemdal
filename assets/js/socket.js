@@ -84,12 +84,8 @@ channel.on("event", payload => {
   $("#alert-" + payload.alert.id).attr("class", status_class(payload.status));
   $("#alert-" + payload.alert.id + " .status").html(show_status(payload.status));
   $("#alert-" + payload.alert.id + " .host").html(payload.alert.host);
-  $("#alert-" + payload.alert.id + " .command").html(payload.alert.command);
-  if (payload.status == "ok") {
-    $("#alert-" + payload.alert.id + " .description").html(payload.result.description);
-  } else {
-    $("#alert-" + payload.alert.id + " .description").html(payload.result);
-  }
+  $("#alert-" + payload.alert.id + " .name").html(payload.alert.name);
+  $("#alert-" + payload.alert.id + " .message").html(payload.result.message);
   $("#alert-" + payload.alert.id + " .last-update").html(payload.last_update);
 });
 

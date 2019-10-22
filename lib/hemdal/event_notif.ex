@@ -59,7 +59,7 @@ defmodule Hemdal.EventNotif do
       if alert_notif.log_all_events or status != prev do
         username = iff(notif.username, @default_username)
         icon = iff(notif.metadata["icon"], @default_icon)
-        desc = iff(metadata["description"], "<no description>")
+        desc = iff(metadata["message"], "<no description>")
         fields = [%{"title" => "Host Name",
                     "value" => alert.host.name,
                     "short" => true},

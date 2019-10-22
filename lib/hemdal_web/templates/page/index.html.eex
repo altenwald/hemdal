@@ -4,8 +4,8 @@
   <thead>
     <th>Status</th>
     <th>Host</th>
-    <th>Command</th>
-    <th>Description</th>
+    <th>Name</th>
+    <th>Message</th>
     <th>Last Update (UTC)</th>
   </thead>
   <tbody>
@@ -13,17 +13,8 @@
   <tr class="<%= status_class(notif["status"]) %>" id="alert-<%= notif["alert"]["id"] %>">
     <td class="status"><%= show_status(notif["status"]) %></td>
     <td class="host"><%= notif["alert"]["host"] %></td>
-    <td class="command"><%= notif["alert"]["command"] %></td>
-    <%= cond do %>
-    <% is_binary(notif["result"]) -> %>
-    <td class="description"><%= notif["result"] %></td>
-    <% notif["status"] == :ok or notif["result"]["description"] != nil -> %>
-    <td class="description"><%= notif["result"]["description"] %></td>
-    <% notif["result"]["message"] != nil -> %>
-    <td class="description"><%= notif["result"]["message"] %></td>
-    <% true -> %>
-    <td class="description"><%= notif["result"] %></td>
-    <% end %>
+    <td class="name"><%= notif["alert"]["name"] %></td>
+    <td class="message"><%= notif["result"]["message"] %></td>
     <td class="last-update"><%= Timex.format!(notif["last_update"], "%F %R", :strftime) %></td>
   </tr>
   <% end %>

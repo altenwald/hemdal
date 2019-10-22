@@ -27,7 +27,12 @@ defmodule Hemdal.Application do
       Hemdal.EventNotif,
       # Start the registry and sup to content the checks (based on database UUID)
       {Registry, keys: :unique, name: Hemdal.Check.Registry},
-      {DynamicSupervisor, strategy: :one_for_one, name: Hemdal.Check.Supervisor},
+      {DynamicSupervisor, strategy: :one_for_one,
+                          name: Hemdal.Check.Supervisor},
+      # Start the registry and sup for hosts
+      {Registry, keys: :unique, name: Hemdal.Host.Conn.Registry},
+      {DynamicSupervisor, strategy: :one_for_one,
+                          name: Hemdal.Host.Conn.Supervisor},
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -39,6 +44,11 @@ defmodule Hemdal.Application do
   @impl Application
   def start_phase(:load_checks, :normal, [:ignore]), do: :ok
   def start_phase(:load_checks, :normal, []) do
+    Hemdal.Host.get_all()
+    |> Enum.each(fn host ->
+                  Logger.info "starting host #{host.description}"
+                  Hemdal.Host.Conn.start host
+                 end)
     Hemdal.Alert.get_all()
     |> Enum.each(fn check ->
                   Logger.info "starting check #{check.name}"

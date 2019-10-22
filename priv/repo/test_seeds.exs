@@ -26,11 +26,12 @@ Repo.insert!(%Host{
   id: host_id,
   name: "127.0.0.1",
   port: 40400,
-  access_type: "certificate",
+  access_type: "rsa",
   username: "manuel.rubio",
   password: nil,
   access_key: File.read!(Path.join([__DIR__, "../../test/user/id_rsa"])),
-  access_pub: File.read!(Path.join([__DIR__, "../../test/user/id_rsa.pub"]))
+  access_pub: File.read!(Path.join([__DIR__, "../../test/user/id_rsa.pub"])),
+  max_workers: 1
 })
 Repo.insert!(%Command{
   id: command_id,
@@ -46,7 +47,9 @@ Repo.insert!(%Alert{
   host_id: host_id,
   command_id: command_id,
   group_id: group_id,
+  check_in_sec: 60,
   recheck_in_sec: 1,
+  broken_recheck_in_sec: 10,
   retries: 1
 })
 
@@ -58,11 +61,12 @@ Repo.insert!(%Host{
   id: host_id,
   name: "127.0.0.1",
   port: 50500,
-  access_type: "certificate",
+  access_type: "rsa",
   username: "manuel.rubio",
   password: nil,
   access_key: File.read!(Path.join([__DIR__, "../../test/user/id_rsa"])),
-  access_pub: File.read!(Path.join([__DIR__, "../../test/user/id_rsa.pub"]))
+  access_pub: File.read!(Path.join([__DIR__, "../../test/user/id_rsa.pub"])),
+  max_workers: 1
 })
 Repo.insert!(%Command{
   id: command_id,
@@ -78,6 +82,8 @@ Repo.insert!(%Alert{
   host_id: host_id,
   command_id: command_id,
   group_id: group_id,
+  check_in_sec: 60,
   recheck_in_sec: 1,
+  broken_recheck_in_sec: 10,
   retries: 1
 })

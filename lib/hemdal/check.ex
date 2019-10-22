@@ -2,10 +2,8 @@ defmodule Hemdal.Check do
   use GenStateMachine, callback_mode: :state_functions, restart: :transient
   require Logger
 
-  @temporal_dir "/tmp"
-  @default_shell "/bin/bash"
-
-  alias Hemdal.{Alert, Command, EventManager}
+  alias Hemdal.{Alert, EventManager}
+  alias Hemdal.Host.Conn
 
   def start(alert) do
     DynamicSupervisor.start_child Hemdal.Check.Supervisor,
@@ -67,15 +65,10 @@ defmodule Hemdal.Check do
   end
 
   defmodule State do
-    @time_to_check 60_000
-    @time_to_check_broken 10_000
-
     defstruct alert: nil,
               status: nil,
               retries: 0,
               last_update: NaiveDateTime.utc_now(),
-              time_to_check: @time_to_check,
-              time_to_check_broken: @time_to_check_broken,
               fail_started: nil
   end
 
@@ -143,7 +136,7 @@ defmodule Hemdal.Check do
                           prev_status: :ok,
                           fail_started: 0,
                           last_update: NaiveDateTime.utc_now(),
-                          metadata: "disabled"})
+                          metadata: %{"message" => "disabled"}})
     {:next_state, :disabled, state}
   end
   def normal(:cast, {:update, alert}, state) do
@@ -159,7 +152,8 @@ defmodule Hemdal.Check do
                               fail_started: 0,
                               last_update: NaiveDateTime.utc_now(),
                               metadata: status})
-        actions = [{:state_timeout, state.time_to_check, :check}]
+        timeout = alert.check_in_sec * 1_000
+        actions = [{:state_timeout, timeout, :check}]
         state = %State{state | status: status,
                                last_update: NaiveDateTime.utc_now()}
         {:keep_state, state, actions}
@@ -169,7 +163,7 @@ defmodule Hemdal.Check do
                               prev_status: :ok,
                               fail_started: 0,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"error" => error}})
+                              metadata: %{"message" => error}})
         Logger.warn "[#{alert.id}] starting to fail [#{alert.name}] for " <>
                     "[#{alert.host.name}]: #{inspect error}"
         timeout = alert.recheck_in_sec * 1_000
@@ -198,7 +192,7 @@ defmodule Hemdal.Check do
                           prev_status: :warn,
                           fail_started: t,
                           last_update: NaiveDateTime.utc_now(),
-                          metadata: "disabled"})
+                          metadata: %{"message" => "disabled"}})
     {:next_state, :disabled, state}
   end
   def failing(:cast, {:update, alert}, state) do
@@ -216,7 +210,8 @@ defmodule Hemdal.Check do
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
                               metadata: status})
-        actions = [{:state_timeout, state.time_to_check, :check}]
+        timeout = alert.check_in_sec * 1_000
+        actions = [{:state_timeout, timeout, :check}]
         state = %State{state | status: status,
                                last_update: NaiveDateTime.utc_now()}
         {:next_state, :normal, state, actions}
@@ -227,11 +222,12 @@ defmodule Hemdal.Check do
                               prev_status: :warn,
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"error" => error}})
+                              metadata: %{"message" => error}})
         Logger.error "[#{alert.id}] confirmed fail [#{alert.name}]" <>
                      " for [#{alert.host.name}] " <>
                      "[#{ellapsed(state.fail_started)} sec]"
-        actions = [{:state_timeout, state.time_to_check_broken, :check}]
+        timeout = alert.broken_recheck_in_sec * 1_000
+        actions = [{:state_timeout, timeout, :check}]
         state = %State{state | status: error,
                                last_update: NaiveDateTime.utc_now()}
         {:next_state, :broken, state, actions}
@@ -247,7 +243,8 @@ defmodule Hemdal.Check do
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
                               metadata: status})
-        actions = [{:state_timeout, state.time_to_check, :check}]
+        timeout = alert.check_in_sec * 1_000
+        actions = [{:state_timeout, timeout, :check}]
         state = %State{state | status: status,
                                last_update: NaiveDateTime.utc_now()}
         {:next_state, :normal, state, actions}
@@ -258,7 +255,7 @@ defmodule Hemdal.Check do
                               prev_status: :warn,
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"error" => error}})
+                              metadata: %{"message" => error}})
         timeout = alert.recheck_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
         state = %State{state | retries: state.retries - 1,
@@ -279,7 +276,7 @@ defmodule Hemdal.Check do
                           prev_status: :error,
                           fail_started: t,
                           last_update: NaiveDateTime.utc_now(),
-                          metadata: "disabled"})
+                          metadata: %{"message" => "disabled"}})
     {:next_state, :disabled, state}
   end
   def broken(:cast, {:update, alert}, state) do
@@ -299,7 +296,8 @@ defmodule Hemdal.Check do
         Logger.info "[#{alert.id}] recover [#{alert.name}] for " <>
                     "[#{alert.host.name}] " <>
                     "[#{ellapsed(state.fail_started)} sec]"
-        actions = [{:state_timeout, state.time_to_check, :check}]
+        timeout = alert.check_in_sec * 1_000
+        actions = [{:state_timeout, timeout, :check}]
         state = %State{state | status: status,
                                last_update: NaiveDateTime.utc_now()}
         {:next_state, :normal, state, actions}
@@ -310,8 +308,9 @@ defmodule Hemdal.Check do
                               prev_status: :error,
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"error" => error}})
-        actions = [{:state_timeout, state.time_to_check_broken, :check}]
+                              metadata: %{"message" => error}})
+        timeout = alert.broken_recheck_in_sec * 1_000
+        actions = [{:state_timeout, timeout, :check}]
         state = %State{state | status: error,
                                last_update: NaiveDateTime.utc_now()}
         {:keep_state, state, actions}
@@ -321,64 +320,11 @@ defmodule Hemdal.Check do
   defp perform_check(alert) do
     Logger.debug "[#{alert.id}] performing check [#{alert.name}] against " <>
                  "[#{alert.host.name}] using [#{alert.command.name}]"
-    opts = [host: String.to_charlist(alert.host.name),
-            port: alert.host.port,
-            user: String.to_charlist(alert.host.username),
-            id_rsa: alert.host.access_key]
-    result = :trooper_ssh.transaction(opts, fn(trooper) ->
-      with {:ok, 0, output} <- exec_cmd(trooper, alert),
-           {:ok, %{"status" => "OK"} = data} <- decode(output) do
-        :trooper_ssh.stop(trooper)
-        Logger.debug("data: #{inspect data}")
-        {:ok, data}
-      else
-        other -> other
-      end
-    end)
-    case result do
-      {:ok, %{"status" => "OK"} = data} -> {:ok, data}
-      {:error, error} -> {:error, "#{inspect error}"}
-      {:ok, %{} = result} -> {:error, result}
-      {:ok, errorlevel, error} ->
-        {:error, %{"errorlevel" => errorlevel,
-                   "message" => error,
-                   "status" => "FAIL"}}
-      other ->
-        Logger.error("error => #{inspect other}")
-        {:error, "#{inspect other}"}
-    end
-  end
-
-  defp decode(output) do
-    case Jason.decode(output) do
-      {:ok, [status, message]} ->
-        {:ok, %{"status" => status, "description" => message}}
-      other_resp -> other_resp
-    end
-  end
-
-  defp random_string do
-    Integer.to_string(:rand.uniform(0x100000000), 36) |> String.downcase
-  end
-
-  defp exec_cmd(trooper, %Alert{command: %Command{command_type: "line",
-                                                  command: command}}) do
-    :trooper_ssh.exec(trooper, command)
-  end
-  defp exec_cmd(trooper, %Alert{command: %Command{command_type: "script",
-                                                  command: script},
-                                command_args: args}) do
-    tmp_file = Path.join([@temporal_dir, random_string()])
-    try do
-      sh = case String.split(script, ["\n"], trim: true) do
-        "#!" <> shell -> shell
-        _ -> @default_shell
-      end
-      :trooper_scp.write_file(trooper, tmp_file, script)
-      cmd = Enum.join([sh, tmp_file|args], " ")
-      :trooper_ssh.exec(trooper, cmd)
-    after
-      :trooper_scp.delete(trooper, tmp_file)
+    if Conn.exists?(alert.host.id) do
+      Conn.exec(alert.host.id, alert.command, alert.command_args)
+    else
+      Conn.start(alert.host)
+      Conn.exec(alert.host.id, alert.command, alert.command_args)
     end
   end
 end
