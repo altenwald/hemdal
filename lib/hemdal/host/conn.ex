@@ -2,7 +2,7 @@ defmodule Hemdal.Host.Conn do
   use GenServer, restart: :transient
   require Logger
 
-  alias Hemdal.{Host, Command}
+  alias Hemdal.{Host, Cred, Command}
 
   @rsa_header "-----BEGIN RSA PRIVATE KEY-----"
   @dsa_header "-----BEGIN DSA PRIVATE KEY-----"
@@ -106,7 +106,7 @@ defmodule Hemdal.Host.Conn do
   defp run_in_background(cmd, args, from, %State{host: host}) do
     opts = [host: String.to_charlist(host.name),
             port: host.port,
-            user: String.to_charlist(host.username)] ++ auth_cfg(host)
+            user: String.to_charlist(host.cred.username)] ++ auth_cfg(host.cred)
     result = :trooper_ssh.transaction(opts, fn(trooper) ->
       with {:ok, 0, output} <- exec_cmd(trooper, cmd, args),
            {:ok, %{"status" => "OK"} = data} <- decode(output) do
@@ -169,32 +169,32 @@ defmodule Hemdal.Host.Conn do
     end
   end
 
-  defp auth_cfg(%Host{access_type: "password", password: password}) do
+  defp auth_cfg(%Cred{type: "password", password: password}) do
     [password: String.to_charlist(password)]
   end
-  defp auth_cfg(%Host{access_type: "rsa", access_key: rsa} = host) do
+  defp auth_cfg(%Cred{type: "rsa", cert_key: rsa} = cred) do
     if not String.starts_with?(rsa, @rsa_header) do
       throw {:error, "Host with an invalid certificate"}
     end
-    case host.password do
+    case cred.password do
       nil -> [id_rsa: rsa]
       password -> [id_rsa: rsa, rsa_pass_pharse: password]
     end
   end
-  defp auth_cfg(%Host{access_type: "dsa", access_key: dsa} = host) do
+  defp auth_cfg(%Cred{type: "dsa", cert_key: dsa} = cred) do
     if not String.starts_with?(dsa, @dsa_header) do
       throw {:error, "Host with an invalid certificate"}
     end
-    case host.password do
+    case cred.password do
       nil -> [id_dsa: dsa]
       password -> [id_dsa: dsa, dsa_pass_pharse: password]
     end
   end
-  defp auth_cfg(%Host{access_type: "ecdsa", access_key: ecdsa} = host) do
+  defp auth_cfg(%Cred{type: "ecdsa", cert_key: ecdsa} = cred) do
     if not String.starts_with?(ecdsa, @ecdsa_header) do
       throw {:error, "Host with an invalid certificate"}
     end
-    case host.password do
+    case cred.password do
       nil -> [id_ecdsa: ecdsa]
       password -> [id_ecdsa: ecdsa, dsa_pass_pharse: password]
     end

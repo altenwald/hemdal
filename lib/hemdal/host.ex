@@ -2,7 +2,7 @@ defmodule Hemdal.Host do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Hemdal.{Repo, Alert, Host}
+  alias Hemdal.{Repo, Alert, Host, Cred}
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -12,20 +12,15 @@ defmodule Hemdal.Host do
     field :name, :string
     field :description, :string
     field :port, :integer, default: 22
-    field :access_type, :string
-    field :username, :string
-    field :password, :string
-    field :access_key, :string
-    field :access_pub, :string
     field :max_workers, :integer, default: 5
 
     has_many :alerts, Alert
+    belongs_to :cred, Cred
     timestamps()
   end
 
-  @required_fields [:name, :access_type, :username]
-  @optional_fields [:port, :access_key, :access_pub, :password, :description,
-                    :max_workers]
+  @required_fields [:name]
+  @optional_fields [:port, :description, :max_workers]
 
   @doc false
   def changeset(host, attrs) do
@@ -34,6 +29,13 @@ defmodule Hemdal.Host do
     |> validate_required(@required_fields)
   end
 
-  def get_all, do: Repo.all(Host)
-  def get_by_id!(id), do: Repo.get!(Host, id)
+  def get_all do
+    Repo.all(Host)
+    |> Repo.preload([:cred])
+  end
+
+  def get_by_id!(id) do
+    Repo.get!(Host, id)
+    |> Repo.preload([:cred])
+  end
 end
