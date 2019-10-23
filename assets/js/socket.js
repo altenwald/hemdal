@@ -70,7 +70,7 @@ function show_status(status) {
 
 function status_class(status) {
   switch (status) {
-    case "ok": return "sucess";
+    case "ok": return "success";
     case "warn": return "warn";
     case "error": return "danger";
   }
