@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+release_remote_ctl rpc --mfa "Hemdal.reload_all/0"

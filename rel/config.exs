@@ -51,5 +51,8 @@ release :hemdal do
   set applications: [
     :runtime_tools
   ]
+  set commands: [
+    reload_all: "rel/commands/reload_all",
+  ]
 end
 
