@@ -5,12 +5,13 @@ defmodule Hemdal.Api.Slack do
   plug Tesla.Middleware.BaseUrl, "https://hooks.slack.com"
   plug Tesla.Middleware.JSON
 
-  def attach(title, color \\ "#b0364d", text) do
-    %{"title" => title, "color" => color, "text" => text}
+  def attach(title, color, fields, img_url \\ "") do
+    %{"title" => title, "color" => color, "fields" => fields,
+      "img_url" => img_url}
   end
 
-  def field(title, color \\ "#b0364d", value, short \\ true) do
-    %{"title" => title, "color" => color, "value" => value, "short" => short}
+  def field(title, value, short \\ true) do
+    %{"title" => title, "value" => value, "short" => short}
   end
 
   def send(slack_msg, uri) do

@@ -60,53 +60,55 @@ defmodule Hemdal.EventNotif do
           """
   end
 
+  defp get_msg(alert, _duration, :disabled, _) do
+    "disabled #{alert.name} on #{alert.host.name}"
+  end
+  defp get_msg(alert, _duration, :ok, :ok) do
+    "sucessful run #{alert.name} on #{alert.host.name}"
+  end
+  defp get_msg(alert, duration, :ok, :warn) do
+    "sucessful again run #{alert.name} on #{alert.host.name} " <>
+    "after #{duration} sec"
+  end
+  defp get_msg(alert, duration, :ok, :error) do
+    "recovered run #{alert.name} on #{alert.host.name} after #{duration} sec"
+  end
+  defp get_msg(alert, _duration, :warn, :ok) do
+    "start to fail #{alert.name} on #{alert.host.name}"
+  end
+  defp get_msg(alert, duration, :warn, :warn) do
+    "failing #{alert.name} on #{alert.host.name} lasting #{duration} sec"
+  end
+  defp get_msg(alert, duration, :error, :warn) do
+    "broken #{alert.name} on #{alert.host.name} lasting #{duration} sec"
+  end
+  defp get_msg(alert, duration, :error, :error) do
+    "still broken #{alert.name} on #{alert.host.name} lasting #{duration} sec"
+  end
+
   def process_event(%{alert: alert, fail_started: duration, status: status,
                       metadata: metadata, prev_status: prev}, state) do
-    message = case {status, prev} do
-      {:disabled, _} -> "disabled #{alert.name} on #{alert.host.name}"
-      {:ok, :ok} -> "sucessful run #{alert.name} on #{alert.host.name}"
-      {:ok, :warn} -> "sucessful again run #{alert.name} on #{alert.host.name} after #{duration} sec"
-      {:ok, :error} -> "recovered run #{alert.name} on #{alert.host.name} after #{duration} sec"
-      {:warn, :ok} -> "start to fail #{alert.name} on #{alert.host.name}"
-      {:warn, :warn} -> "failing #{alert.name} on #{alert.host.name} lasting #{duration} sec"
-      {:error, :warn} -> "broken #{alert.name} on #{alert.host.name} lasting #{duration} sec"
-      {:error, :error} -> "still broken #{alert.name} on #{alert.host.name} lasting #{duration} sec"
-    end
     Enum.each(alert.alert_notifs, fn %AlertNotif{notif: notif} = alert_notif ->
       if check_log_level(alert_notif.log_level, prev, status) do
+        notif_mod = Module.concat([Hemdal.Api, notif.type])
         username = iff(notif.username, @default_username)
         icon = iff(notif.metadata["icon"], @default_icon)
         desc = iff(metadata["message"], "<no description>")
-        fields = [%{"title" => "Host Name",
-                    "value" => alert.host.name,
-                    "short" => true},
-                  %{"title" => "Command Name",
-                    "value" => alert.command.name,
-                    "short" => true},
-                  %{"title" => "Description",
-                    "value" => desc,
-                    "short" => false},
-                  %{"title" => "Status",
-                    "value" => to_text(status),
-                    "short" => true},
-                  %{"title" => "Prev. Status",
-                    "value" => to_text(prev),
-                    "short" => true},
-                  %{"title" => "Duration",
-                    "value" => "#{duration} sec",
-                    "short" => true}]
-        atts = [%{"title" => alert.name,
-                  "fields" => fields,
-                  "image_url" => "",
-                  "color" => to_color(status)}]
+        fields = [notif_mod.field("Host Name", alert.host.name),
+                  notif_mod.field("Command Name", alert.command.name),
+                  notif_mod.field("Description", desc, false),
+                  notif_mod.field("Status", to_text(status)),
+                  notif_mod.field("Prev. Status", to_text(prev)),
+                  notif_mod.field("Duration", "#{duration} sec"),
+                  notif_mod.field("Incoming Status", metadata["status"])]
+        atts = [notif_mod.attach(alert.name, to_color(status), fields)]
         channel = iff(notif.metadata["channel"], @default_channel)
-        message = %{"text" => message,
+        message = %{"text" => get_msg(alert, duration, status, prev),
                     "username" => username,
                     "icon_emoji" => icon,
                     "channel" => channel,
                     "attachments" => atts}
-        notif_mod = Module.concat([Hemdal.Api, notif.type])
-        apply(notif_mod, :send, [message, notif.token])
+        notif_mod.send(message, notif.token)
       end
     end)
     {:noreply, [], state}
