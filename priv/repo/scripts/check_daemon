@@ -1,0 +1,25 @@
+#!/bin/bash
+
+UNKNOWN_STATE=3
+CRITICAL_STATE=2
+WARNING_STATE=1
+OK_STATE=0
+
+PROCESS="$1"
+
+if [ -z "$PROCESS" ]; then
+    echo '["UNKNOWN", "no process name provided"]'
+    exit $UNKNOWN_STATE
+fi
+
+
+MSG="$(systemctl status --plain $PROCESS | grep Active: | sed -E 's/^\s*Active: ([a-z]+) [^;]+;/\1/' | xargs echo -n)"
+
+case "$(echo $MSG | cut -d' ' -f1)" in
+    "active") STATUS="OK"; ERRORLEVEL=$OK_STATE ;;
+    "inactive") STATUS="FAIL"; ERRORLEVEL=$CRITICAL_STATE ;;
+    *) STATUS="UNKNOWN"; ERRORLEVEL=$UNKNOWN_STATE ;;
+esac
+
+echo "[\"$STATUS\", \"$MSG\"]"
+exit $ERRORLEVEL

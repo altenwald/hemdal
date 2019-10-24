@@ -36,6 +36,12 @@ alias Hemdal.{Repo, Command}
     name: "check docker",
     command_type: "script",
     command: File.read!(Path.join([__DIR__, "scripts/check_docker"]))
-  }
+  },
+  %Command{
+    id: UUID.uuid4(),
+    name: "check daemon",
+    command_type: "script",
+    command: File.read!(Path.join([__DIR__, "scripts/check_daemon"]))
+  },
 ]
 |> Enum.each(&(Repo.insert!(&1)))
