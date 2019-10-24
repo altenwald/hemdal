@@ -44,13 +44,25 @@ defmodule Hemdal.Host.Conn do
     GenServer.call(via(id), {:exec, cmd, args}, @timeout_exec)
   end
 
+  def get_pid(name) do
+    case Registry.lookup(@registry_name, name) do
+      [{pid, nil}] -> pid
+      [] -> nil
+    end
+  end
+
   def reload_all do
     Host.get_all()
     |> Enum.each(&update_host/1)
   end
 
   def update_host(host) do
-    GenServer.cast(via(host.id), {:update, host})
+    if exists?(host.id) do
+      GenStateMachine.cast via(host.id), {:update, host}
+      {:ok, get_pid(host.id)}
+    else
+      start(host)
+    end
   end
 
   defmodule State do
