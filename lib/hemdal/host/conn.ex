@@ -108,31 +108,40 @@ defmodule Hemdal.Host.Conn do
             port: host.port,
             user: String.to_charlist(host.cred.username)] ++ auth_cfg(host.cred)
     result = :trooper_ssh.transaction(opts, fn(trooper) ->
-      with {:ok, 0, output} <- exec_cmd(trooper, cmd, args),
-           {:ok, %{"status" => "OK"} = data} <- decode(output) do
-        Logger.debug("data: #{inspect data}")
-        {:ok, data}
+      with {:ok, errorlevel, output} <- exec_cmd(trooper, cmd, args),
+           {:ok, %{"status" => status} = data} <- decode(output) do
+        Logger.debug("command exit(#{errorlevel}) output: #{inspect data}")
+        cond do
+          errorlevel == 0 or status == "OK" ->
+            {:ok, Map.put(data, "status", "OK")}
+          errorlevel == 1 or status == "WARN" ->
+            {:error, Map.put(data, "status", "WARN")}
+          errorlevel == 2 or status == "FAIL" ->
+            {:error, Map.put(data, "status", "FAIL")}
+          true ->
+            {:error, Map.put(data, "status", "UNKNOWN")}
+        end
       else
         other -> other
       end
     end)
     reply = case result do
       {:ok, %{"status" => "OK"} = data} -> {:ok, data}
-      {:error, error} when is_binary(error) -> {:error, error}
-      {:error, error} -> {:error, "#{inspect error}"}
-      {:ok, %{} = result} -> {:error, result}
-      {:ok, errorlevel, error} ->
-        {:error, %{"errorlevel" => errorlevel,
-                    "message" => error,
-                    "status" => "FAIL"}}
+      {:ok, %{} = result} ->
+        {:error, %{"status" => "UNKNOWN", "message" => "#{inspect result}"}}
+      {:error, error} when is_binary(error) ->
+        {:error, %{"message" => error, "status" => "UNKNOWN"}}
+      {:error, %{"status" => _} = error} -> {:error, error}
+      {:error, error} ->
+        {:error, %{"message" => "#{inspect error}", "status" => "UNKNOWN"}}
       other when not is_binary(other) ->
         Logger.error("error => #{inspect other}")
         {:error, %{"message" => "#{inspect other}",
-                    "status" => "FAIL"}}
+                   "status" => "FAIL"}}
       other ->
         Logger.error("error => #{other}")
         {:error, %{"message" => other,
-                    "status" => "FAIL"}}
+                   "status" => "FAIL"}}
     end
     GenServer.reply(from, reply)
   end
@@ -141,6 +150,8 @@ defmodule Hemdal.Host.Conn do
     case Jason.decode(output) do
       {:ok, [status, message]} ->
         {:ok, %{"status" => status, "message" => message}}
+      {:error, %Jason.DecodeError{data: error}} ->
+        {:error, %{"message" => error, "status" => "UNKNOWN"}}
       other_resp -> other_resp
     end
   end

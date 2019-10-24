@@ -5,6 +5,8 @@ defmodule Hemdal.Check do
   alias Hemdal.{Alert, EventManager}
   alias Hemdal.Host.Conn
 
+  @metadata_disabled %{"status" => "OFF", "message" => "disabled"}
+
   def start(alert) do
     DynamicSupervisor.start_child Hemdal.Check.Supervisor,
                                   {__MODULE__, [alert]}
@@ -112,7 +114,7 @@ defmodule Hemdal.Check do
   end
 
   def disabled({:call, from}, :get_status, state) do
-    reply = build_reply(:disabled, state)
+    reply = build_reply(:disabled, %State{state | status: @metadata_disabled})
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
   def disabled(:cast, {:update, %Alert{enabled: false} = alert}, state) do
@@ -136,7 +138,7 @@ defmodule Hemdal.Check do
                           prev_status: :ok,
                           fail_started: 0,
                           last_update: NaiveDateTime.utc_now(),
-                          metadata: %{"message" => "disabled"}})
+                          metadata: @metadata_disabled})
     {:next_state, :disabled, state}
   end
   def normal(:cast, {:update, alert}, state) do
@@ -163,7 +165,7 @@ defmodule Hemdal.Check do
                               prev_status: :ok,
                               fail_started: 0,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"message" => error}})
+                              metadata: error})
         Logger.warn "[#{alert.id}] starting to fail [#{alert.name}] for " <>
                     "[#{alert.host.name}]: #{inspect error}"
         timeout = alert.recheck_in_sec * 1_000
@@ -192,7 +194,7 @@ defmodule Hemdal.Check do
                           prev_status: :warn,
                           fail_started: t,
                           last_update: NaiveDateTime.utc_now(),
-                          metadata: %{"message" => "disabled"}})
+                          metadata: @metadata_disabled})
     {:next_state, :disabled, state}
   end
   def failing(:cast, {:update, alert}, state) do
@@ -222,7 +224,7 @@ defmodule Hemdal.Check do
                               prev_status: :warn,
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"message" => error}})
+                              metadata: error})
         Logger.error "[#{alert.id}] confirmed fail [#{alert.name}]" <>
                      " for [#{alert.host.name}] " <>
                      "[#{ellapsed(state.fail_started)} sec]"
@@ -255,7 +257,7 @@ defmodule Hemdal.Check do
                               prev_status: :warn,
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"message" => error}})
+                              metadata: error})
         timeout = alert.recheck_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
         state = %State{state | retries: state.retries - 1,
@@ -276,7 +278,7 @@ defmodule Hemdal.Check do
                           prev_status: :error,
                           fail_started: t,
                           last_update: NaiveDateTime.utc_now(),
-                          metadata: %{"message" => "disabled"}})
+                          metadata: @metadata_disabled})
     {:next_state, :disabled, state}
   end
   def broken(:cast, {:update, alert}, state) do
@@ -308,7 +310,7 @@ defmodule Hemdal.Check do
                               prev_status: :error,
                               fail_started: t,
                               last_update: NaiveDateTime.utc_now(),
-                              metadata: %{"message" => error}})
+                              metadata: error})
         timeout = alert.broken_recheck_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
         state = %State{state | status: error,
