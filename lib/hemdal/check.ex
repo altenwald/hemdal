@@ -67,6 +67,7 @@ defmodule Hemdal.Check do
   end
 
   defmodule State do
+    @moduledoc false
     defstruct alert: nil,
               status: nil,
               retries: 0,

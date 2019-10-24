@@ -66,6 +66,7 @@ defmodule Hemdal.Host.Conn do
   end
 
   defmodule State do
+    @moduledoc false
     defstruct host: nil,
               workers: nil,
               queue: []

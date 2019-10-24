@@ -22,24 +22,19 @@ Features:
 
 You can see what is done and what is in progress in our [Trello](https://trello.com/b/07r5YR8Y/hemdal) board.
 
-## Getting started
+## Documentation
 
-First, you need to clone the repository. I think Github gives a lot of information about how to do this. Eventually, when a release is available you can download directly the tarball instead of the repository.
+Documentation is available through [hexdocs here](https://hexdocs.pm/hemdal).
 
-To proceed using `git` we can perform these commands:
+## Why LGPL?!?
 
-```
-git clone git@github.com:altenwald/hemdal.git
-cd hemdal
-mix do deps.get, compile
-iex -S mix phx.server
-```
+Despite of a lot of people think, LGPL it's not too restrictive. It's like many others around (MIT, BSD, Apache, ...) but makes an extra-effort to keep this code (and only this code, not yours) always free (free as freedom and not like a free beer).
 
-At this moment, this is the development usage. This way you can check faster if the system is working properly for you.
+Said that, if you want to include this code with your code (propietary or with other licences), you can! there is no problem! The only restriction is: **when you make modifications in THIS code, you should to share them** and all of the community will be grateful if you open a pull request to get feedback to the original project ;-).
 
 ## What's next?
 
-Documentation is coming soon... in the meantime, you can open an issue to ask whatever, request a feature o report a bug. Also you can provide PR (pull requests) with fixes if you catch some of them, or provide some features.
+Check the [documentation](https://hexdocs.pm/hemdal) first and, if you find something wrong, broken or you want to make a suggestion or ask something, you can open an issue via Github issues. Also you can provide PR (pull requests) with fixes if you catch some of them, or provide some features. Keep in mind our [Code of Conduct](CODE_OF_CONDUCT.md). You can also check [our documentation about how to contributing to get further information](CONTRIBUTING.md).
 
 Don't forget to support us if you find this project interesting enough:
 

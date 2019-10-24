@@ -1,16 +1,20 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
+  @version "0.5.0"
+
   def project do
     [
       app: :hemdal,
-      version: "0.5.0",
+      version: @version,
       elixir: "~> 1.8",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      name: "Hemdal",
+      docs: docs(),
     ]
   end
 
@@ -46,7 +50,6 @@ defmodule Hemdal.MixProject do
       {:ecto_sql, "~> 3.1"},
       {:postgrex, ">= 0.0.0"},
       {:phoenix_html, "~> 2.11"},
-      {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:gettext, "~> 0.11"},
       {:jason, "~> 1.0"},
       {:plug_cowboy, "~> 2.0"},
@@ -57,6 +60,10 @@ defmodule Hemdal.MixProject do
       # for releases
       {:distillery, "~> 2.0"},
       {:ecto_boot_migration, "~> 0.2.0"},
+
+      # only for dev
+      {:phoenix_live_reload, "~> 1.2", only: :dev},
+      {:ex_doc, "~> 0.19.0", only: :dev},
     ]
   end
 
@@ -76,6 +83,74 @@ defmodule Hemdal.MixProject do
              "run priv/repo/seeds.exs",
              "run priv/repo/test_seeds.exs",
              "test --cover"]
+    ]
+  end
+
+  defp docs do
+    [
+      main: "Hemdal",
+      source_ref: "v#{@version}",
+      canonical: "http://hexdocs.pm/hemdal",
+      #logo: "guides/images/hemdal.png",
+      extra_section: "GUIDES",
+      source_url: "https://github.com/altenwald/hemdal",
+      extras: extras(),
+      groups_for_extras: groups_for_extras(),
+      groups_for_modules: [
+        "Models": [
+          Hemdal.Alert,
+          Hemdal.AlertNotif,
+          Hemdal.Command,
+          Hemdal.Cred,
+          Hemdal.Group,
+          Hemdal.Host,
+          Hemdal.Notif,
+          Hemdal.Log,
+          Hemdal.Repo,
+        ],
+        "Event Producer/Consumers": [
+          Hemdal.EventManager,
+          Hemdal.EventChannel,
+          Hemdal.EventLogger,
+          Hemdal.EventNotif,
+        ],
+        "API": [
+          Hemdal.Api.Slack,
+        ],
+        "Alert/Alarms Logic": [
+          Hemdal.Check,
+          Hemdal.Host.Conn,
+        ],
+        "Web Interface": [
+          Hemdal.CheckChannel,
+          HemdalWeb,
+          HemdalWeb.CheckSocket,
+          HemdalWeb.Endpoint,
+          HemdalWeb.ErrorHelpers,
+          HemdalWeb.ErrorView,
+          HemdalWeb.Gettext,
+          HemdalWeb.LayoutView,
+          HemdalWeb.PageController,
+          HemdalWeb.PageView,
+          HemdalWeb.Router,
+          HemdalWeb.Router.Helpers,
+        ]
+      ]
+    ]
+  end
+
+  defp extras do
+    [
+      "guides/introduction/Getting_Started.md",
+      "guides/operational/Creating_Alerts.md",
+      "guides/operational/Notifying_to_Slack.md",
+    ]
+  end
+
+  defp groups_for_extras do
+    [
+      "Introduction": ~r/guides\/introduction\/.?/,
+      "Operational": ~r/guides\/operational\/.?/,
     ]
   end
 end

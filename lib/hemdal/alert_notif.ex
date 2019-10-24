@@ -37,7 +37,7 @@ defmodule Hemdal.AlertNotif do
       "debug" -> changeset
       "warn" -> changeset
       "error" -> changeset
-      value -> add_error(changeset, :log_level, @log_level_msg)
+      _value -> add_error(changeset, :log_level, @log_level_msg)
     end
   end
 end
