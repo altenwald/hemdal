@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#
+# Usage: check_php_fpm url warning critical
+#
+# This plugin is based on this work :
+# https://github.com/bdossantos/nagios-plugins
+
+UNKNOWN_STATE=3
+CRITICAL_STATE=2
+WARNING_STATE=1
+OK_STATE=0
+
+URL="$1"
+if [ -z "$URL" ]; then
+  echo "[\"UNKNOWN\", \"missing URL configuration\"]"
+  exit $UNKNOWN_STATE
+fi
+
+WARN=${WARN:=90}
+FAIL=${FAIL:=95}
+
+if [[ $WARN -ge $FAIL ]]; then
+  echo "[\"UNKNOWN\", \"warning ($WARN) can't be greater than critical ($FAIL)\"]"
+  exit $UNKNOWN_STATE
+fi
+
+if [ ! -x "$(which wget)" ]; then
+  echo "[\"UNKNOWN\", \"command wget is required\"]"
+  exit $UNKNOWN_STATE
+fi
+
+STATUS=$(wget --no-check-certificate -q -t 3 -T 3 $URL -O -)
+
+if [[ $? -ne 0 ]] || [[ -z "$STATUS" ]]; then
+  echo "[\"FAIL\", \"could not fetch php-fpm pool status page $URL\"]"
+  exit $CRITICAL_STATE
+fi
+
+ACTIVE=$(echo "$STATUS" \
+  | grep -w 'active processes:' \
+  | head -n 1 \
+  | awk '{ print $3 }'
+)
+TOTAL=$(echo "$STATUS" \
+  | grep 'total processes' \
+  | awk '{ print $3 }'
+)
+
+if [[ -z "$ACTIVE" ]] || [[ -z "$TOTAL" ]]; then
+  echo "[\"UNKNOWN\", \"'active_processes' or 'total_processes' are empty\"]"
+  exit $UNKNOWN_STATE
+fi
+
+USED=$((ACTIVE * 100 / TOTAL))
+STATUS="$USED% of process pool is used ($ACTIVE active processes on $TOTAL)";
+
+if [[ "$USED" -gt "$FAIL" ]]; then
+  echo "[\"FAIL\", \"$STATUS\"]"
+  exit $CRITICAL_STATE
+fi
+
+if [[ "$USED" -gt "$WARN" ]]; then
+  echo "[\"WARN\", \"$STATUS\"]"
+  exit $WARNING_STATE
+fi
+
+echo "[\"OK\", \"$STATUS\"]"
+exit $OK_STATE
