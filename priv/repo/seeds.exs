@@ -39,6 +39,12 @@ alias Hemdal.{Repo, Command}
   },
   %Command{
     id: UUID.uuid4(),
+    name: "check docker memory",
+    command_type: "script",
+    command: File.read!(Path.join([__DIR__, "scripts/check_docker_mem"]))
+  },
+  %Command{
+    id: UUID.uuid4(),
     name: "check daemon",
     command_type: "script",
     command: File.read!(Path.join([__DIR__, "scripts/check_daemon"]))

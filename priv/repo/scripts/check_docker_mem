@@ -1,0 +1,26 @@
+#!/bin/bash
+
+UNKNOWN_STATE=3
+CRITICAL_STATE=2
+WARNING_STATE=1
+OK_STATE=0
+
+CONTAINER_NAME="$1"
+LIMIT_MEMORY="${2:-1000}"
+
+if [ -z "$CONTAINER_NAME" ]; then
+    echo '["UNKNOWN", "missing container name"]'
+    exit $UNKNOWN_STATE
+fi
+
+MEMORY_USAGE=$(docker exec $CONTAINER_NAME cat /sys/fs/cgroup/memory/memory.usage_in_bytes)
+MEMORY_TOTAL=$(docker inspect $CONTAINER_NAME | jq '.[0]["HostConfig"]["Memory"]')
+MEMORY_FREE=$(echo "($MEMORY_TOTAL-$MEMORY_USAGE)/1000000" | bc)
+
+if [ "$MEMORY_FREE" -gt "$LIMIT_MEMORY" ]; then
+    echo "[\"OK\", \"$CONTAINER_NAME has $MEMORY_FREE MB free memory\"]"
+    exit $OK_STATE
+fi
+
+echo "[\"FAIL\", \"$CONTAINER_NAME has $MEMORY_FREE MB only!\"]"
+exit $CRITICAL_STATE
