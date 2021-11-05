@@ -1,7 +1,7 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
-  @version "0.5.1"
+  @version "0.5.2"
 
   def project do
     [
@@ -77,13 +77,38 @@ defmodule Hemdal.MixProject do
     [
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.drop",
-             "ecto.create",
-             "ecto.migrate",
-             "run priv/repo/seeds.exs",
+      test: ["ecto.reset",
              "run priv/repo/test_seeds.exs",
-             "test --cover"]
+             "test --cover"],
+      "assets.compile": &compile_assets/1,
+      "npm.install": &nmp_install/1,
+      release: [
+        "local.hex --force",
+        "local.rebar --force",
+        "clean",
+        "deps.get",
+        "compile",
+        "npm.install",
+        "assets.compile",
+        "phx.digest",
+        "distillery.release --upgrade --env=prod"
+      ]
     ]
+  end
+
+  defp compile_assets(_) do
+    if File.dir?("priv/static"), do: File.rm_rf!("priv/static")
+    webpack = "cd assets && node node_modules/webpack/bin/webpack.js"
+
+    if Mix.env() != :prod do
+      Mix.shell().cmd("#{webpack} --mode development")
+    else
+      Mix.shell().cmd("#{webpack} --mode production")
+    end
+  end
+
+  defp nmp_install(_) do
+    Mix.shell().cmd("cd assets && npm i && npm rebuild node-sass")
   end
 
   defp docs do
