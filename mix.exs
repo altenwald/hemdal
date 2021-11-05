@@ -100,11 +100,12 @@ defmodule Hemdal.MixProject do
     if File.dir?("priv/static"), do: File.rm_rf!("priv/static")
     webpack = "cd assets && node node_modules/webpack/bin/webpack.js"
 
-    if Mix.env() != :prod do
+    # FIXME: production release isn't working but both are similar
+    # if Mix.env() != :prod do
       Mix.shell().cmd("#{webpack} --mode development")
-    else
-      Mix.shell().cmd("#{webpack} --mode production")
-    end
+    # else
+    #   Mix.shell().cmd("#{webpack} --mode production")
+    # end
   end
 
   defp nmp_install(_) do
