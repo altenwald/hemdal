@@ -44,25 +44,29 @@ defmodule Hemdal.Event.Log do
     :ok
   end
 
-  defp get_message(event, :disabled, _),
-    do: "disabled #{event.alert.name} on #{event.alert.host.name}"
+  defp get_message(event, :disabled, _) do
+    "disabled #{event.alert.name} on #{event.alert.host.name}"
+  end
 
-  defp get_message(event, :ok, :ok),
-    do: "sucessful run #{event.alert.name} on #{event.alert.host.name}"
+  defp get_message(event, :ok, :ok) do
+    "sucessful run #{event.alert.name} on #{event.alert.host.name}"
+  end
 
-  defp get_message(event, :ok, :warn),
-    do:
-      "sucessful again run #{event.alert.name} on #{event.alert.host.name} after #{event.duration} sec"
+  defp get_message(event, :ok, :warn) do
+    "sucessful again run #{event.alert.name} on #{event.alert.host.name} after #{event[:duration] || "unknown"} sec"
+  end
 
-  defp get_message(event, :ok, :error),
-    do:
-      "recovered run #{event.alert.name} on #{event.alert.host.name} after #{event.duration} sec"
+  defp get_message(event, :ok, :error) do
+    "recovered run #{event.alert.name} on #{event.alert.host.name} after #{event[:duration] || "unknown"} sec"
+  end
 
-  defp get_message(event, :warn, :ok),
-    do: "start to fail #{event.alert.name} on #{event.alert.host.name}"
+  defp get_message(event, :warn, :ok) do
+    "start to fail #{event.alert.name} on #{event.alert.host.name}"
+  end
 
-  defp get_message(event, :warn, :warn),
-    do: "failing #{event.alert.name} on #{event.alert.host.name} lasting #{event.duration} sec"
+  defp get_message(event, :warn, :warn) do
+    "failing #{event.alert.name} on #{event.alert.host.name} lasting #{event.duration} sec"
+  end
 
   defp get_message(event, :error, :warn) do
     "broken #{event.alert.name} on #{event.alert.host.name} lasting #{event[:duration] || "unknown"} sec"
