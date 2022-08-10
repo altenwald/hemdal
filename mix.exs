@@ -36,13 +36,9 @@ defmodule Hemdal.MixProject do
     [
       {:gen_state_machine, "~> 3.0"},
       {:gen_stage, "~> 1.1"},
-      {:trooper, "~> 0.3.0"},
       {:construct, "~> 2.1"},
       {:tesla, "~> 1.4"},
       {:jason, "~> 1.3"},
-
-      # for releases
-      {:distillery, "~> 2.1"},
 
       # only for dev
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
