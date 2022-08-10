@@ -2,7 +2,6 @@
 import Config
 
 config :hemdal,
-  log_all_events: false,
   config_module: Hemdal.Config.Backend.Env
 
 config :hemdal, Hemdal.Config, [

@@ -89,7 +89,6 @@ defmodule Hemdal.Check do
   @impl GenStateMachine
   def init([alert]) do
     state = %__MODULE__{alert: alert, last_update: NaiveDateTime.utc_now()}
-    ## FIXME retrieve initial state name from alert (logs)
     if alert.enabled do
       {:ok, :normal, state, [{:next_event, :state_timeout, :check}]}
     else
