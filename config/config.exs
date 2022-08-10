@@ -7,38 +7,52 @@ config :hemdal,
 
 config :hemdal, Hemdal.Config, [
   [
-    id: "b60c4bd2-6d0d-4cbd-bbc5-6985226f9fee",
-    name: "check ssh",
+    id: "aea48656-be08-4576-a2d0-2723458faefd",
+    name: "valid alert check",
     host: [
-      id: "43debde2-424b-4751-b53c-eb037c5ea2d5",
+      id: "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
       type: "Local",
-      name: "server1"
+      name: "127.0.0.1",
+      max_workers: 1
     ],
     command: [
-      id: "b446c60d-eba9-4be9-a87c-b801b4c51696",
-      name: "check ssh",
-      command_type: "script",
-      command: "echo '[\"OK\", \"Hello world\"]'"
+      id: "c5c090b2-7b6a-487e-87b8-57788bffaffe",
+      name: "get ok status",
+      command_type: "line",
+      command: "echo '[\"OK\", \"valid one!\"]'"
     ],
-    notifiers: [
-      [
-        id: "b337687e-784c-4bb9-af2f-623e8238b4b1",
-        token: "/services/T052XFQAE/B1705659P/zMoaWhzu8yhBWOtRWRU97bdP",
-        username: "hemdal",
-        type: "Slack",
-        metadata: %{"icon" => "heimdall", "channel" => "#alerts"}
-      ],
-      [
-        id: "3c282db4-7cce-499e-a1aa-79046ecf79a9",
-        token: "8b3efuxxdtfmmmki457f15f4fh",
-        username: "altenwald.com",
-        type: "Mattermost",
-        metadata: %{
-          "channel" => "ytdjgj36s3nyjrxgx3djgdbwoy",
-          "base_url" => "https://altenwald.cloud.mattermost.com/api/v4"
-        }
-      ]
-    ]
+    group: [
+      id: "35945f03-a691-46e6-b3dd-07c07c513be0",
+      name: "Testing"
+    ],
+    check_in_sec: 60,
+    recheck_in_sec: 1,
+    broken_recheck_in_sec: 10,
+    retries: 1
+  ],
+  [
+    id: "6b6d247c-48c3-4a8c-9b4f-773f178ddc0f",
+    name: "invalid alert check",
+    host: [
+      id: "fd1393bf-c554-45fe-869a-d253466da8ea",
+      type: "Local",
+      name: "127.0.0.1",
+      max_workers: 1
+    ],
+    command: [
+      id: "6b07ea20-f677-44bc-90f4-e07b611068f3",
+      name: "get failed status",
+      command_type: "line",
+      command: "echo '[\"FAIL\", \"invalid one!\"]'"
+    ],
+    group: [
+      id: "35945f03-a691-46e6-b3dd-07c07c513be0",
+      name: "Testing"
+    ],
+    check_in_sec: 60,
+    recheck_in_sec: 1,
+    broken_recheck_in_sec: 10,
+    retries: 1
   ]
 ]
 

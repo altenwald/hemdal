@@ -13,10 +13,10 @@ defmodule HemdalCheckTest do
     Process.sleep(500)
 
     status = Check.get_status(alert.id)
-    %{"status" => :ok, "result" => %{"message" => "valid one!"}} = status
+    assert %{"status" => :ok, "result" => %{"message" => "valid one!"}} = status
     Process.sleep(1_000)
     status = Check.get_status(alert.id)
-    %{"status" => :ok, "result" => %{"message" => "valid one!"}} = status
+    assert %{"status" => :ok, "result" => %{"message" => "valid one!"}} = status
 
     Hemdal.Event.Log.stop()
     Check.stop(pid)
@@ -30,10 +30,10 @@ defmodule HemdalCheckTest do
     Process.sleep(500)
 
     status = Check.get_status(alert.id)
-    %{"status" => :warn, "result" => %{"message" => "invalid one!"}} = status
+    assert %{"status" => :warn, "result" => %{"message" => "invalid one!"}} = status
     Process.sleep(1_000)
     status = Check.get_status(alert.id)
-    %{"status" => :error, "result" => %{"message" => "invalid one!"}} = status
+    assert %{"status" => :error, "result" => %{"message" => "invalid one!"}} = status
 
     Hemdal.Event.Log.stop()
     Check.stop(alert.id)
