@@ -43,7 +43,12 @@ defmodule Hemdal.Check do
 
   def reload_all do
     Hemdal.Config.get_all_alerts()
-    |> Enum.each(&update_alert(&1))
+    |> Enum.each(&update_alert/1)
+  end
+
+  def start_all do
+    Hemdal.Config.get_all_alerts()
+    |> Enum.each(&start/1)
   end
 
   def get_all do

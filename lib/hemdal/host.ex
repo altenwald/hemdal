@@ -52,6 +52,11 @@ defmodule Hemdal.Host do
     |> Enum.each(&update_host/1)
   end
 
+  def start_all do
+    Hemdal.Config.get_all_hosts()
+    |> Enum.each(&start/1)
+  end
+
   def update_host(host) do
     if exists?(host.id) do
       GenStateMachine.cast(via(host.id), {:update, host})

@@ -30,18 +30,8 @@ defmodule Hemdal.Application do
   def start_phase(:load_checks, :normal, [:ignore]), do: :ok
 
   def start_phase(:load_checks, :normal, []) do
-    Hemdal.Config.get_all_hosts()
-    |> Enum.each(fn host ->
-      Logger.info("starting host #{host.description}")
-      Hemdal.Host.start(host)
-    end)
-
-    Hemdal.Config.get_all_alerts()
-    |> Enum.each(fn check ->
-      Logger.info("starting check #{check.name}")
-      Hemdal.Check.start(check)
-    end)
-
+    Hemdal.Host.start_all()
+    Hemdal.Check.start_all()
     :ok
   end
 end
