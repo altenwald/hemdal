@@ -24,7 +24,7 @@ defmodule Hemdal.Host.Trooper do
 
   @impl Hemdal.Host
   def write_file(trooper, tmp_file, content) do
-    :trooper_scp.write_file(trooper, tmp_file, content)
+    :trooper_scp.write_file(trooper, String.to_charlist(tmp_file), String.to_charlist(content))
   end
 
   @impl Hemdal.Host

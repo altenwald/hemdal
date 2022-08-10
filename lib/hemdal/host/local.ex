@@ -8,7 +8,7 @@ defmodule Hemdal.Host.Local do
 
   @impl Hemdal.Host
   def exec(_opts, command) do
-    {output, errorlevel} = System.shell(command, [])
+    {output, errorlevel} = System.shell(to_string(command), [])
     {:ok, errorlevel, output}
   end
 

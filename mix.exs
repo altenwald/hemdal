@@ -45,7 +45,11 @@ defmodule Hemdal.MixProject do
       {:distillery, "~> 2.1"},
 
       # only for dev
-      {:ex_doc, "~> 0.28", only: :dev}
+      {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:doctor, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:ex_check, "~> 0.14", only: [:dev, :test], runtime: false},
+      {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
   end
 

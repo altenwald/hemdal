@@ -117,6 +117,34 @@ defmodule Hemdal.Host do
     {:noreply, state}
   end
 
+  defp run_result(data, 2, "FAIL"), do: {:error, Map.put(data, "status", "FAIL")}
+  defp run_result(data, 1, "WARN"), do: {:error, Map.put(data, "status", "WARN")}
+  defp run_result(data, 0, "OK"), do: {:ok, Map.put(data, "status", "OK")}
+  defp run_result(data, _errorlevel, _status), do: {:error, Map.put(data, "status", "UNKNOWN")}
+
+  defp final_run_result({:ok, %{"status" => "OK"} = data}), do: {:ok, data}
+
+  defp final_run_result({:ok, %{} = result}),
+    do: {:error, %{"status" => "UNKNOWN", "message" => "#{inspect(result)}"}}
+
+  defp final_run_result({:error, error}) when is_binary(error),
+    do: {:error, %{"message" => error, "status" => "UNKNOWN"}}
+
+  defp final_run_result({:error, %{"status" => _} = error}), do: {:error, error}
+
+  defp final_run_result({:error, error}),
+    do: {:error, %{"message" => "#{inspect(error)}", "status" => "UNKNOWN"}}
+
+  defp final_run_result(other) when not is_binary(other) do
+    Logger.error("error => #{inspect(other)}")
+    {:error, %{"message" => "#{inspect(other)}", "status" => "FAIL"}}
+  end
+
+  defp final_run_result(other) do
+    Logger.error("error => #{other}")
+    {:error, %{"message" => other, "status" => "FAIL"}}
+  end
+
   defp run_in_background(cmd, args, from, %__MODULE__{host: host}) do
     mod = Module.concat([__MODULE__, host.type])
 
@@ -125,52 +153,13 @@ defmodule Hemdal.Host do
         with {:ok, errorlevel, output} <- exec_cmd(trooper, mod, cmd, args),
              {:ok, %{"status" => status} = data} <- decode(output) do
           Logger.debug("command exit(#{errorlevel}) output: #{inspect(data)}")
-
-          cond do
-            errorlevel == 2 or status == "FAIL" ->
-              {:error, Map.put(data, "status", "FAIL")}
-
-            errorlevel == 1 or status == "WARN" ->
-              {:error, Map.put(data, "status", "WARN")}
-
-            errorlevel == 0 or status == "OK" ->
-              {:ok, Map.put(data, "status", "OK")}
-
-            true ->
-              {:error, Map.put(data, "status", "UNKNOWN")}
-          end
+          run_result(data, errorlevel, status)
         else
           other -> other
         end
       end)
 
-    reply =
-      case result do
-        {:ok, %{"status" => "OK"} = data} ->
-          {:ok, data}
-
-        {:ok, %{} = result} ->
-          {:error, %{"status" => "UNKNOWN", "message" => "#{inspect(result)}"}}
-
-        {:error, error} when is_binary(error) ->
-          {:error, %{"message" => error, "status" => "UNKNOWN"}}
-
-        {:error, %{"status" => _} = error} ->
-          {:error, error}
-
-        {:error, error} ->
-          {:error, %{"message" => "#{inspect(error)}", "status" => "UNKNOWN"}}
-
-        other when not is_binary(other) ->
-          Logger.error("error => #{inspect(other)}")
-          {:error, %{"message" => "#{inspect(other)}", "status" => "FAIL"}}
-
-        other ->
-          Logger.error("error => #{other}")
-          {:error, %{"message" => other, "status" => "FAIL"}}
-      end
-
-    GenServer.reply(from, reply)
+    GenServer.reply(from, final_run_result(result))
   end
 
   defp decode(output) do
@@ -206,7 +195,7 @@ defmodule Hemdal.Host do
     try do
       sh =
         case String.split(script, ["\n"], trim: true) do
-          "#!" <> shell -> shell
+          ["#!" <> shell | _] -> shell
           _ -> @default_shell
         end
 
@@ -218,21 +207,20 @@ defmodule Hemdal.Host do
     end
   end
 
-  @type opts() :: Keyword.t()
   @type handler() :: any
-  @type command() :: String.t()
+  @type command() :: charlist()
   @type errorlevel() :: integer()
   @type output() :: String.t()
   @type reason() :: any
 
-  @callback transaction(opts(), (handler() -> any)) :: any
+  @callback transaction(Hemdal.Config.Host.t(), (handler() -> any)) :: any
 
   @callback exec(handler(), command()) :: {:ok, errorlevel(), output()} | {:error, reason()}
 
   @callback write_file(handler(), tmp_file :: String.t(), content :: String.t()) ::
               :ok | {:error, reason()}
 
-  @callback delete(handler(), tpm_file :: String.t()) :: :ok | {:error, reason()}
+  @callback delete(handler(), tpm_file :: charlist()) :: :ok | {:error, reason()}
 
   defmacro __using__(_opts) do
     quote do

@@ -20,7 +20,7 @@ defmodule Hemdal.Config do
 
   def get_alert_by_id!(id), do: backend().get_alert_by_id!(id)
 
-  @callback get_all_hosts() :: Host.t()
+  @callback get_all_hosts() :: [Host.t()]
 
   def get_all_hosts, do: backend().get_all_hosts()
 
