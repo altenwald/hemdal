@@ -67,7 +67,7 @@ defmodule Hemdal do
   """
 
   def reload_all do
-    Hemdal.Host.Conn.reload_all
-    Hemdal.Check.reload_all
+    Hemdal.Host.reload_all()
+    Hemdal.Check.reload_all()
   end
 end

@@ -1,0 +1,40 @@
+[
+  {
+    "id": "aea48656-be08-4576-a2d0-2723458faefd",
+    "name": "valid alert check",
+    "host_id": "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
+    "command": {
+      "id": "c5c090b2-7b6a-487e-87b8-57788bffaffe",
+      "name": "get ok status",
+      "command_type": "line",
+      "command": "\"[\\\"OK\\\", \\\"valid one!\\\"]\"."
+    },
+    "group": {
+      "id": "35945f03-a691-46e6-b3dd-07c07c513be0",
+      "name": "Testing"
+    },
+    "check_in_sec": 60,
+    "recheck_in_sec": 1,
+    "broken_recheck_in_sec": 10,
+    "retries": 1
+  },
+  {
+    "id": "6b6d247c-48c3-4a8c-9b4f-773f178ddc0f",
+    "name": "invalid alert check",
+    "host_id": "fd1393bf-c554-45fe-869a-d253466da8ea",
+    "command": {
+      "id": "6b07ea20-f677-44bc-90f4-e07b611068f3",
+      "name": "get failed status",
+      "command_type": "line",
+      "command": "\"[\\\"FAIL\\\", \\\"invalid one!\\\"]\"."
+    },
+    "group": {
+      "id": "35945f03-a691-46e6-b3dd-07c07c513be0",
+      "name": "Testing"
+    },
+    "check_in_sec": 60,
+    "recheck_in_sec": 1,
+    "broken_recheck_in_sec": 10,
+    "retries": 1
+  }
+]

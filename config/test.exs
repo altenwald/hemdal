@@ -1,18 +1,12 @@
-use Mix.Config
-
-# Configure your database
-config :hemdal, Hemdal.Repo,
-  username: "postgres",
-  password: "postgres",
-  database: "hemdal_test",
-  hostname: "localhost",
-  pool: Ecto.Adapters.SQL.Sandbox
-
-# We don't run a server during test. If one is required,
-# you can enable the server option below.
-config :hemdal, HemdalWeb.Endpoint,
-  http: [port: 4002],
-  server: false
+import Config
 
 # Print only warnings and errors during test
 config :logger, level: :debug
+
+config :hemdal,
+  log_all_events: false,
+  config_module: Hemdal.Config.Backend.Json
+
+config :hemdal, Hemdal.Config,
+  hosts_file: "test/resources/hosts_config.json",
+  alerts_file: "test/resources/alerts_config.json"
