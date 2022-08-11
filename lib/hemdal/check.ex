@@ -89,6 +89,7 @@ defmodule Hemdal.Check do
   @impl GenStateMachine
   def init([alert]) do
     state = %__MODULE__{alert: alert, last_update: NaiveDateTime.utc_now()}
+
     if alert.enabled do
       {:ok, :normal, state, [{:next_event, :state_timeout, :check}]}
     else
@@ -104,19 +105,26 @@ defmodule Hemdal.Check do
   defp build_reply(type, %__MODULE__{alert: alert, status: status} = state) do
     %{
       "status" => type,
-      "alert" => %{
-        "id" => alert.id,
-        "name" => alert.name,
-        "host" => alert.host.description || alert.host.name,
-        "command" => alert.command.name,
-        "group" => %{
-          "name" => alert.group.name,
-          "id" => alert.group.id
+      "alert" =>
+        %{
+          "id" => alert.id,
+          "name" => alert.name,
+          "host" => alert.host.description || alert.host.name,
+          "command" => alert.command.name
         }
-      },
+        |> maybe_group(alert.group),
       "last_update" => state.last_update,
       "result" => status
     }
+  end
+
+  defp maybe_group(alert, nil), do: alert
+
+  defp maybe_group(alert, group) do
+    Map.put(alert, "group", %{
+      "name" => group.name,
+      "id" => group.id
+    })
   end
 
   def disabled({:call, from}, :get_status, state) do
