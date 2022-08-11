@@ -1,6 +1,5 @@
 defmodule Hemdal.Event.Notification do
   use GenStage
-  require Logger
 
   alias Hemdal.Config.Notifier
 

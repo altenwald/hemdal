@@ -1,18 +1,12 @@
 defmodule Hemdal.Notifier.Slack do
+  use Hemdal.Notifier
   use Tesla
   require Logger
 
   plug(Tesla.Middleware.BaseUrl, "https://hooks.slack.com")
   plug(Tesla.Middleware.JSON)
 
-  def attach(title, color, fields, img_url \\ "") do
-    %{"title" => title, "color" => color, "fields" => fields, "img_url" => img_url}
-  end
-
-  def field(title, value, short \\ true) do
-    %{"title" => title, "value" => value, "short" => short}
-  end
-
+  @impl Hemdal.Notifier
   def send(slack_msg, uri, _metadata) do
     Logger.debug("sending to #{uri}: #{inspect(slack_msg)}")
 

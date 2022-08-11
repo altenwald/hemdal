@@ -5,10 +5,6 @@ defmodule Hemdal.Event do
     GenStage.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  def stop do
-    GenStage.stop(__MODULE__)
-  end
-
   def notify(event), do: GenStage.cast(__MODULE__, {:notify, event})
 
   def init([]) do

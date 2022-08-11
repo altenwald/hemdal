@@ -78,4 +78,49 @@ defmodule Hemdal.Notifier do
 
     notifier_mod.send(message, notifier.token, notifier.metadata)
   end
+
+  @type message() :: map()
+  @type token() :: String.t()
+  @type metadata() :: map()
+
+  @callback send(message(), token(), metadata()) :: any()
+
+  @type field_name() :: String.t()
+  @type field_value() :: String.t()
+  @type short?() :: boolean()
+  @type field() :: map()
+
+  @callback field(field_name(), field_value()) :: field()
+  @callback field(field_name(), field_value(), short?()) :: field()
+
+  @type attach_name() :: String.t()
+  @type attach_color() :: String.t()
+  @type attach_fields() :: [field()]
+
+  @callback attach(attach_name, attach_color, attach_fields) :: map()
+
+  def attach(title, color, fields, img_url \\ "") do
+    %{"title" => title, "color" => color, "fields" => fields, "img_url" => img_url}
+  end
+
+  def field(title, value, short? \\ true) do
+    %{"title" => title, "value" => value, "short" => short?}
+  end
+
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour Hemdal.Notifier
+
+      @impl Hemdal.Notifier
+      defdelegate attach(title, color, fields, image_url \\ ""), to: Hemdal.Notifier
+
+      @impl Hemdal.Notifier
+      defdelegate field(title, value, short? \\ true), to: Hemdal.Notifier
+
+      defoverridable attach: 3,
+                     attach: 4,
+                     field: 2,
+                     field: 3
+    end
+  end
 end

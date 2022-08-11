@@ -27,11 +27,13 @@ defmodule Hemdal.Application do
   end
 
   @impl Application
-  def start_phase(:load_checks, :normal, [:ignore]), do: :ok
-
-  def start_phase(:load_checks, :normal, []) do
-    Hemdal.Host.start_all()
-    Hemdal.Check.start_all()
-    :ok
+  if Mix.env() == :test do
+    def start_phase(:load_checks, :normal, _args), do: :ok
+  else
+    def start_phase(:load_checks, :normal, _args) do
+      Hemdal.Host.start_all()
+      Hemdal.Check.start_all()
+      :ok
+    end
   end
 end

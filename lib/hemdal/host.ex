@@ -15,18 +15,13 @@ defmodule Hemdal.Host do
   end
 
   def start(host) do
-    DynamicSupervisor.start_child(@sup_name, {__MODULE__, [self(), host]})
-
-    receive do
-      :continue -> :ok
-    after
-      1_000 -> :error
-    end
+    {:ok, _} = DynamicSupervisor.start_child(@sup_name, {__MODULE__, [host]})
+    :ok
   end
 
-  def start_link([parent, host]) do
+  def start_link([host]) do
     Logger.info("starting #{host.id} - #{host.name}")
-    GenServer.start_link(__MODULE__, [parent, host], name: via(host.id))
+    GenServer.start_link(__MODULE__, [host], name: via(host.id))
   end
 
   def exists?(name) do
@@ -72,8 +67,7 @@ defmodule Hemdal.Host do
 
   @impl GenServer
   @doc false
-  def init([parent, host]) do
-    send(parent, :continue)
+  def init([host]) do
     {:ok, %__MODULE__{host: host, workers: host.max_workers}}
   end
 

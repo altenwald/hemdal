@@ -1,17 +1,11 @@
 defmodule Hemdal.Notifier.Mattermost do
+  use Hemdal.Notifier
   use Tesla
   require Logger
 
   plug(Tesla.Middleware.JSON)
 
-  def attach(title, color, fields, img_url \\ "") do
-    %{"title" => title, "color" => color, "fields" => fields, "img_url" => img_url}
-  end
-
-  def field(title, value, short \\ true) do
-    %{"title" => title, "value" => value, "short" => short}
-  end
-
+  @impl Hemdal.Notifier
   def send(msg, token, metadata) do
     msg = %{
       "channel_id" => msg["channel"],
