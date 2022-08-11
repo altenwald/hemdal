@@ -2,28 +2,8 @@
   {
     "id": "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
     "name": "127.0.0.1",
-    "port": 40400,
-    "max_workers": 1,
-    "credential": {
-      "id": "ff47ed0e-ea1f-4e54-ab4a-c406a78339f7",
-      "type": "rsa",
-      "username": "manuel.rubio",
-      "cert_key": "file:test/user/id_rsa",
-      "cert_pub": "file:test/user/id_rsa.pub"
-    }
-  },
-  {
-    "id": "fd1393bf-c554-45fe-869a-d253466da8ea",
-    "name": "127.0.0.1",
-    "port": 50500,
-    "max_workers": 1,
-    "credential": {
-      "id": "ff47ed0e-ea1f-4e54-ab4a-c406a78339f7",
-      "type": "rsa",
-      "username": "manuel.rubio",
-      "cert_key": "file:test/user/id_rsa",
-      "cert_pub": "file:test/user/id_rsa.pub"
-    }
+    "type": "Local",
+    "max_workers": 1
   }
 ]
 
