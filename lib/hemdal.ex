@@ -5,69 +5,89 @@ defmodule Hemdal do
   the status of different elements of your system providing back information
   about these checks.
 
+  The Hemdal Core is agnostic to the way we can be
+  connected to the external server to perform checks and even, we can
+  implement our own agents in case the access or communication to the servers
+  is difficult or requires customization.
+
   ## Motivation
 
   The problem with other systems like Nagios, Icinga or Sensu is they are
   based on the client/server infrastructure and requires to install an agent
-  inside of each remote node. Hemdal works in the opposite way. Hemdal
-  requires to configure an SSH access to the server to be monitorized, which
-  could be even configured using a ssh proxy tunnel, transfer there the
-  needed scripts (if needed) or run the specific commands and gather the
-  responses.
+  inside of each remote node. Hemdal is agnostic about the way of access to
+  the host but it's more inclined to provide the mechanics needed to connect
+  actively without agents. However, it's agnostic, it's meaning that we could
+  implement an agent and access to the server using that agent.
 
-  ## Connection to Monitored Services
+  ## Hosts
 
-  The connections to the other node are handled in a very controlled way.
-  You can define how many connections are supported at the same time, and the
-  frequency of the tests made. For example, you can check every minute or every
-  30 seconds a very important service but only once a week or once a day the
-  SSL certificate expiration date.
+  The way to run the checks depends on the host. By default, `hemdal_core` is
+  only implementing `Local` which is running locally the commands using the
+  same user as the hemdal core. The available and official hosts are the
+  following ones:
 
-  ## The power of BEAM
+  - `Local`, included with core.
+  - `[Trooper](https://github.com/altenwald/hemdal_trooper)` uses
+    [Trooper](https://github.com/army-cat/trooper) to connect via SSH to the
+    remote servers.
 
-  This system is built on top of BEAM. That let us to handle each
-  alert inside of a different process and even spread in different nodes.
-  Each alert is indeed a state machine which have perfect control of the checks
-  the result and what is going to do in the following steps according to the
-  results.
+  See `Hemdal.Config` for further information.
 
-  Of course, everything is reloaded without stopping the system. We can add new
-  hosts, change configuration for these hosts and change alerts, notifications,
-  timers, everything. It's reloaded immediately and applied when it's secure to
-  be applied.
+  ## Config
 
-  ## Everything is an event
+  The configuration is also abstracted using `Hemdal.Config`. We can use only
+  one provider and this should be configured as follows:
 
-  The internal system is based on event broadcasting. There is a producer which
-  generates events from check processes and these are broadcasted to all of the
-  event consumers: channels (for web real-time monitoring), logger (for
-  database storage) and notif (to send it via Slack and in near future other
-  notification providers).
+  ```elixir
+  # config/config.exs
+  config :hemdal, :config_module, Hemdal.Config.Backend.Env
 
-  ## Database, why?
+  config :hemdal, Hemdal.Config, [
+    # here the checks configuration
+  ]
+  ```
 
-  Becase we need persistence and databases are great for that. But the database
-  in this case isn't strongly used. The information from database is requested
-  only at beginning and when a `reload` command is performed.
+  We have available the following official backends for the configuration:
 
-  Of course, the main role of the database is store also the logs for the changes
-  of the alerts/alarms. Just in case you need to restart the system, we can gather
-  the information about the alerts from the database and start rechecking again.
+  - `Hemdal.Config.Backend.Env`, as shown above, it's putting the whole
+    configuration inside of the configuration file for Elixir.
+  - `Hemdal.Config.Backend.Json`, it's specifying the JSON files to be
+    loaded and they are loaded each time we are requesting data for the
+    alerts.
 
-  ## Clustering
+  See `Hemdal.Config` for further information.
 
-  The main focus for this system is scalability. And make it as easy as possible.
-  It's still a work in progress but using [Horde](https://github.com/derekkraan/horde)
-  we can achieve to distribute the check processes through all of the nodes you
-  have connected in a BEAM way.
+  ## Event
 
-  ## Further information
+  When something is happening with the checks an event is generated. There
+  are different ways to configure the way we receive the events and it's
+  linked to the checks, see `Hemdal.Check` for further information.
 
-  Check our guides to get more information about some specific points.
+  The events could be implemented via `GenStage`. See `Hemdal.Event` for
+  futher information.
+
+  ## Notification
+
+  One of the event consumers is in charge of triggering notifications. These
+  have a specific format. We have implementation at the moment for the
+  following backends for the notifications:
+
+  - `Hemdal.Notifier.Slack` is sending the event to a Slack webhook.
+  - `Hemdal.Notifier.Mattermost` is sending the even to a Mattermost webhook.
+
+  See `Hemdal.Notifier` for futher information.
   """
 
   def reload_all do
     Hemdal.Host.reload_all()
     Hemdal.Check.reload_all()
+    :ok
+  end
+
+  defdelegate get_all_alerts, to: Hemdal.Check, as: :get_all
+
+  def start_alert!(id) do
+    Hemdal.Config.get_alert_by_id!(id)
+    |> Hemdal.Check.start()
   end
 end

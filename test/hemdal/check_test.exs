@@ -1,4 +1,4 @@
-defmodule HemdalCheckTest do
+defmodule Hemdal.CheckTest do
   use ExUnit.Case, async: false
   require Logger
 
@@ -74,7 +74,6 @@ defmodule HemdalCheckTest do
       status = Check.get_status(alert.id)
       assert %{"status" => :ok, "result" => %{"message" => "valid one!"}} = status
 
-      Hemdal.Event.Log.stop()
       Hemdal.Event.Mock.stop(cap)
       Check.stop(pid)
     end
@@ -95,7 +94,6 @@ defmodule HemdalCheckTest do
       status = Check.get_status(alert.id)
       assert %{"status" => :error, "result" => %{"message" => "invalid one!"}} = status
 
-      Hemdal.Event.Log.stop()
       Hemdal.Event.Mock.stop(cap)
       Check.stop(alert.id)
     end
@@ -124,7 +122,6 @@ defmodule HemdalCheckTest do
       status = Check.get_status(alert.id)
       assert %{"status" => :ok, "result" => %{"message" => "valid one!"}} = status
 
-      Hemdal.Event.Log.stop()
       Hemdal.Event.Mock.stop(cap)
       Check.stop(pid)
     end
@@ -142,7 +139,6 @@ defmodule HemdalCheckTest do
       status = Check.get_status(alert_id)
       assert %{"status" => :error, "result" => %{"message" => "invalid one!"}} = status
 
-      Hemdal.Event.Log.stop()
       Hemdal.Event.Mock.stop(cap)
       Check.stop(alert_id)
     end
