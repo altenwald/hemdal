@@ -1,7 +1,6 @@
 # Hemdal Alerts/Alarms Panel
 
-[![Build Status](https://img.shields.io/travis/altenwald/hemdal/master.svg)](https://travis-ci.org/altenwald/hemdal)
-[![Codecov](https://img.shields.io/codecov/c/github/altenwald/hemdal.svg)](https://codecov.io/gh/altenwald/hemdal)
+[![Build Status](https://img.shields.io/github/workflow/status/altenwald/hemdal/check)](https://travis-ci.org/altenwald/hemdal)
 [![License: LGPL 2.1](https://img.shields.io/github/license/altenwald/hemdal.svg)](https://raw.githubusercontent.com/altenwald/hemdal/master/COPYING)
 [![Paypal: Donation](https://img.shields.io/badge/paypal-donation-yellow)](https://www.paypal.com/donate/?hosted_button_id=XK6Z5XATN77L2)
 [![Patreon: Donation](https://img.shields.io/badge/patreon-donation-yellow)](https://www.patreon.com/altenwald)
