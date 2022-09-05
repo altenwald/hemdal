@@ -27,7 +27,7 @@ defmodule Hemdal.Config.Backend.Json do
     {
       "id": "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
       "name": "localhost",
-      "type": "Local",
+      "module": "Hemdal.Host.Local",
       "max_workers": 1
     }
   ]

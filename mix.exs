@@ -13,7 +13,9 @@ defmodule Hemdal.MixProject do
       aliases: aliases(),
       deps: deps(),
       name: "Hemdal",
-      docs: docs()
+      description: "Hemdal Alarms/Alerts System",
+      docs: docs(),
+      package: package()
     ]
   end
 
@@ -118,6 +120,18 @@ defmodule Hemdal.MixProject do
     [
       Introduction: ~r/guides\/introduction\/.?/,
       Operational: ~r/guides\/operational\/.?/
+    ]
+  end
+
+  defp package do
+    [
+      files: ~w[ lib guides mix.* *.md COPYING ],
+      maintainers: ["Manuel Rubio"],
+      licenses: ["LGPL-2.1-only"],
+      links: %{
+        "GitHub" => "https://github.com/altenwald/hemdal",
+        "Docs" => "https://hexdocs.pm/hemdal"
+      }
     ]
   end
 end
