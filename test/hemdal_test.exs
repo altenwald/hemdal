@@ -7,6 +7,7 @@ defmodule HemdalTest do
 
   test "get all alerts" do
     alert_id = "325cf8b7-6a9d-4c79-973d-df940d3df1c2"
+
     Application.put_env(:hemdal, Hemdal.Config, [
       [
         id: alert_id,
@@ -18,9 +19,8 @@ defmodule HemdalTest do
           name: "127.0.0.1"
         ],
         command: [
-          id: "c5c090b2-7b6a-487e-87b8-57788bffaffe",
           name: "get ok status",
-          command_type: "line",
+          type: "line",
           command: "echo '[\"OK\", \"valid one!\"]'"
         ],
         check_in_sec: 60,
@@ -32,27 +32,30 @@ defmodule HemdalTest do
 
     assert [] == Hemdal.get_all_alerts()
     assert {:ok, _pid} = Hemdal.start_alert!(alert_id)
+
     assert [
-      %{
-        "alert" => %{
-          "command" => "get ok status",
-          "host" => "127.0.0.1",
-          "id" => ^alert_id,
-          "name" => "valid alert check"
-        },
-        "last_update" => _last_update,
-        "result" => %{
-          "message" => "disabled",
-          "status" => "OFF"
-        },
-        "status" => :disabled
-      }
-    ] = Hemdal.get_all_alerts()
+             %{
+               "alert" => %{
+                 "command" => "get ok status",
+                 "host" => "127.0.0.1",
+                 "id" => ^alert_id,
+                 "name" => "valid alert check"
+               },
+               "last_update" => _last_update,
+               "result" => %{
+                 "message" => "disabled",
+                 "status" => "OFF"
+               },
+               "status" => :disabled
+             }
+           ] = Hemdal.get_all_alerts()
+
     Hemdal.Check.stop(alert_id)
   end
 
   test "reload all" do
     alert_id = "5b7bcf07-53b9-4248-b6ea-fc2881431435"
+
     Application.put_env(:hemdal, Hemdal.Config, [
       [
         id: alert_id,
@@ -64,9 +67,8 @@ defmodule HemdalTest do
           name: "127.0.0.1"
         ],
         command: [
-          id: "53205485-e34f-4a72-ba8f-506a95909c8a",
           name: "get ok status",
-          command_type: "line",
+          type: "line",
           command: "echo '[\"OK\", \"valid one!\"]'"
         ],
         check_in_sec: 60,
@@ -77,21 +79,22 @@ defmodule HemdalTest do
     ])
 
     assert {:ok, _pid} = Hemdal.start_alert!(alert_id)
+
     assert [
-      %{
-        "alert" => %{
-          "command" => "get ok status",
-          "host" => "127.0.0.1",
-          "id" => ^alert_id,
-          "name" => "valid alert check"
-        },
-        "result" => %{
-          "message" => "disabled",
-          "status" => "OFF"
-        },
-        "status" => :disabled
-      }
-    ] = Hemdal.get_all_alerts()
+             %{
+               "alert" => %{
+                 "command" => "get ok status",
+                 "host" => "127.0.0.1",
+                 "id" => ^alert_id,
+                 "name" => "valid alert check"
+               },
+               "result" => %{
+                 "message" => "disabled",
+                 "status" => "OFF"
+               },
+               "status" => :disabled
+             }
+           ] = Hemdal.get_all_alerts()
 
     Application.put_env(:hemdal, Hemdal.Config, [
       [
@@ -104,9 +107,8 @@ defmodule HemdalTest do
           name: "localhost"
         ],
         command: [
-          id: "c5c090b2-7b6a-487e-87b8-57788bffaffe",
           name: "get ok status",
-          command_type: "line",
+          type: "line",
           command: "echo '[\"OK\", \"valid one!\"]'"
         ],
         check_in_sec: 60,
@@ -117,21 +119,23 @@ defmodule HemdalTest do
     ])
 
     assert :ok == Hemdal.reload_all()
+
     assert [
-      %{
-        "alert" => %{
-          "command" => "get ok status",
-          "host" => "localhost",
-          "id" => ^alert_id,
-          "name" => "valid reloaded alert check"
-        },
-        "result" => %{
-          "message" => "disabled",
-          "status" => "OFF"
-        },
-        "status" => :disabled
-      }
-    ] = Hemdal.get_all_alerts()
+             %{
+               "alert" => %{
+                 "command" => "get ok status",
+                 "host" => "localhost",
+                 "id" => ^alert_id,
+                 "name" => "valid reloaded alert check"
+               },
+               "result" => %{
+                 "message" => "disabled",
+                 "status" => "OFF"
+               },
+               "status" => :disabled
+             }
+           ] = Hemdal.get_all_alerts()
+
     Hemdal.Check.stop(alert_id)
   end
 end

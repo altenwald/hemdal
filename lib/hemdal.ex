@@ -78,14 +78,28 @@ defmodule Hemdal do
   See `Hemdal.Notifier` for futher information.
   """
 
+  @doc """
+  Reload all of the alerts and hosts. See `Hemdal.Check.reload_all/0` and
+  `Hemdal.Host.reload_all/0` for further information.
+  """
+  @spec reload_all() :: :ok
   def reload_all do
     Hemdal.Host.reload_all()
     Hemdal.Check.reload_all()
     :ok
   end
 
+  @doc """
+  Retrieve all the alerts. See `Hemdal.Check.get_all/0` for further
+  information.
+  """
+  @spec get_all_alerts() :: [Hemdal.Check.returned_status()]
   defdelegate get_all_alerts, to: Hemdal.Check, as: :get_all
 
+  @doc """
+  Start the alert based on the alert ID.
+  """
+  @spec start_alert!(id :: String.t()) :: {:ok, pid()}
   def start_alert!(id) do
     Hemdal.Config.get_alert_by_id!(id)
     |> Hemdal.Check.start()

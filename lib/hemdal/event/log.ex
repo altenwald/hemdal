@@ -1,38 +1,46 @@
 defmodule Hemdal.Event.Log do
+  @moduledoc """
+  Consume each event from `Hemdal.Event` and process it to generate a log
+  via `Logger`.
+  """
   use GenStage
   require Logger
 
   @event_manager Hemdal.Event
 
+  @doc false
+  @spec start_link([]) :: {:ok, pid()}
   def start_link([]) do
-    GenStage.start_link(__MODULE__, [], name: __MODULE__)
+    {:ok, _pid} = GenStage.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  def stop do
-    GenStage.stop(__MODULE__)
-  end
+  @doc false
+  @spec stop :: :ok
+  def stop, do: GenStage.stop(__MODULE__)
 
   @impl GenStage
+  @doc false
   def init([]) do
     state = %{log_level: Application.get_env(:hemdal, :log_level, "warn")}
     {:consumer, state, subscribe_to: [@event_manager]}
   end
 
-  @impl true
+  @impl GenStage
+  @doc false
   def handle_events(events, _from, state) do
     Enum.each(events, &process_event(&1, state.log_level))
     {:noreply, [], state}
   end
 
-  def process_event(%{status: status, prev_status: prev}, "error")
-      when not (status == "FAIL" and prev != "FAIL") and
-             not (status != "FAIL" and prev == "FAIL") do
+  defp process_event(%{status: status, prev_status: prev}, "error")
+       when not (status == "FAIL" and prev != "FAIL") and
+              not (status != "FAIL" and prev == "FAIL") do
     :ok
   end
 
-  def process_event(%{status: status, prev_status: status}, "warn"), do: :ok
+  defp process_event(%{status: status, prev_status: status}, "warn"), do: :ok
 
-  def process_event(event, _log_level) do
+  defp process_event(event, _log_level) do
     message = get_message(event, event.status, event.prev_status)
 
     case event.status do
@@ -53,11 +61,11 @@ defmodule Hemdal.Event.Log do
   end
 
   defp get_message(event, :ok, :warn) do
-    "sucessful again run #{event.alert.name} on #{event.alert.host.name} after #{event[:duration] || "unknown"} sec"
+    "sucessful again run #{event.alert.name} on #{event.alert.host.name} after #{event.fail_duration || "unknown"} sec"
   end
 
   defp get_message(event, :ok, :error) do
-    "recovered run #{event.alert.name} on #{event.alert.host.name} after #{event[:duration] || "unknown"} sec"
+    "recovered run #{event.alert.name} on #{event.alert.host.name} after #{event.fail_duration || "unknown"} sec"
   end
 
   defp get_message(event, :warn, :ok) do
@@ -65,11 +73,11 @@ defmodule Hemdal.Event.Log do
   end
 
   defp get_message(event, :warn, :warn) do
-    "failing #{event.alert.name} on #{event.alert.host.name} lasting #{event.duration} sec"
+    "failing #{event.alert.name} on #{event.alert.host.name} lasting #{event.fail_duration} sec"
   end
 
   defp get_message(event, :error, :warn) do
-    "broken #{event.alert.name} on #{event.alert.host.name} lasting #{event[:duration] || "unknown"} sec"
+    "broken #{event.alert.name} on #{event.alert.host.name} lasting #{event.fail_duration || "unknown"} sec"
   end
 
   defp get_message(event, :error, :error) do

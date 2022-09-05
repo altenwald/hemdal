@@ -4,14 +4,9 @@
     "name": "valid alert check",
     "host_id": "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
     "command": {
-      "id": "c5c090b2-7b6a-487e-87b8-57788bffaffe",
       "name": "get ok status",
-      "command_type": "line",
+      "type": "line",
       "command": "echo '[\"OK\", \"valid one!\"]'"
-    },
-    "group": {
-      "id": "35945f03-a691-46e6-b3dd-07c07c513be0",
-      "name": "Testing"
     },
     "check_in_sec": 60,
     "recheck_in_sec": 1,
@@ -23,14 +18,9 @@
     "name": "invalid alert check",
     "host_id": "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
     "command": {
-      "id": "6b07ea20-f677-44bc-90f4-e07b611068f3",
       "name": "get failed status",
-      "command_type": "line",
+      "type": "line",
       "command": "echo '[\"FAIL\", \"invalid one!\"]'"
-    },
-    "group": {
-      "id": "35945f03-a691-46e6-b3dd-07c07c513be0",
-      "name": "Testing"
     },
     "check_in_sec": 60,
     "recheck_in_sec": 1,

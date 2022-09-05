@@ -1,32 +1,12 @@
 [
   {
     "id": "01acc056-9412-455b-8372-9726385ebb4b",
-    "name": "127.0.0.1",
-    "description": "My Machine",
-    "port": 50500,
-    "username": "manuel.rubio",
-    "max_workers": 1,
-    "credential": {
-      "id": "ff47ed0e-ea1f-4e54-ab4a-c406a78339f7",
-      "type": "rsa",
-      "username": "manuel.rubio",
-      "cert_key": "file:test/resources/cert_key.txt",
-      "cert_pub": "file:test/resources/cert_pub.txt"
-    }
+    "name": "My Machine 1",
+    "max_workers": 1
   },
   {
     "id": "b827b01e-236a-4463-bde8-ee18ff3c80fe",
-    "name": "127.0.0.1",
-    "description": "My Machine",
-    "port": 40400,
-    "username": "manuel.rubio",
-    "max_workers": 1,
-    "credential": {
-      "id": "625d572c-9cc3-49f9-9c60-2e3261f58031",
-      "type": "dsa",
-      "username": "manuel.rubio",
-      "cert_key": "CERT_KEY",
-      "cert_pub": "CERT_PUB"
-    }
+    "name": "My Machine 2",
+    "max_workers": 1
   }
 ]

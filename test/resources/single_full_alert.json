@@ -4,18 +4,12 @@
     "name": "single valid check",
     "host_id": "01acc056-9412-455b-8372-9726385ebb4b",
     "command": {
-      "id": "4303b614-9af8-4cda-a326-fdea1de626e5",
       "name": "get ok status",
-      "command_type": "line",
+      "type": "line",
       "command": "echo '[\"OK\", \"valid one!\"]'"
-    },
-    "group": {
-      "id": "40abe200-2e1e-4edd-8b83-355956c925ce",
-      "name": "Testing"
     },
     "notifiers": [
       {
-        "id": "4738acee-7ac1-4c18-a003-9be23fd9c13e",
         "type": "Mock",
         "username": "altenwald",
         "token": "TOKEN"

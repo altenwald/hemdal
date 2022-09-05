@@ -1,24 +1,44 @@
 defmodule Hemdal.Event.Notification do
+  @moduledoc """
+  Consume events from `Hemdal.Event` to generate the notifications
+  via `Hemdal.Notifier`. It's based on the configuration from the
+  `Hemdal.Config.Notifier` module and based on the configuration
+  for the `log_level` and the level of the event, it could be
+  reported or not.
+
+  The log levels could be:
+
+  - `debug` it's reporting everything to the notifier.
+  - `warn` notifies if the previous status is different from
+    the new one.
+  - `error` notifies only if the change is from/to error status.
+  """
   use GenStage
 
   alias Hemdal.Config.Notifier
 
   @event_manager Hemdal.Event
 
+  @doc false
+  @spec start_link([]) :: {:ok, pid()}
   def start_link([]) do
-    GenStage.start_link(__MODULE__, [], name: __MODULE__)
+    {:ok, _pid} = GenStage.start_link(__MODULE__, [], name: __MODULE__)
   end
 
+  @doc false
+  @spec stop() :: :ok
   def stop do
     GenStage.stop(__MODULE__)
   end
 
   @impl GenStage
+  @doc false
   def init([]) do
     {:consumer, %{}, subscribe_to: [@event_manager]}
   end
 
   @impl true
+  @doc false
   def handle_events(events, _from, state) do
     List.foldl(events, {:noreply, [], state}, fn
       event, {:noreply, [], state} -> process_event(event, state)
@@ -47,7 +67,7 @@ defmodule Hemdal.Event.Notification do
   def process_event(
         %{
           alert: alert,
-          fail_started: duration,
+          fail_duration: duration,
           status: status,
           metadata: metadata,
           prev_status: prev

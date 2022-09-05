@@ -16,7 +16,6 @@ defmodule Hemdal.CheckTest do
       ]
 
       notifier = [
-        id: "82d3a827-08fc-41be-9f6d-04d66dddd2a4",
         metadata: %{
           pid: self()
         },
@@ -31,9 +30,8 @@ defmodule Hemdal.CheckTest do
           name: "valid alert check",
           host: host,
           command: [
-            id: "c5c090b2-7b6a-487e-87b8-57788bffaffe",
             name: "get ok status",
-            command_type: "line",
+            type: "line",
             command: "echo '[\"OK\", \"valid one!\"]'"
           ],
           notifiers: [notifier],
@@ -47,9 +45,8 @@ defmodule Hemdal.CheckTest do
           name: "invalid alert check",
           host: host,
           command: [
-            id: "6b07ea20-f677-44bc-90f4-e07b611068f3",
             name: "get failed status",
-            command_type: "line",
+            type: "line",
             command: "echo '[\"FAIL\", \"invalid one!\"]'"
           ],
           notifiers: [notifier],
