@@ -22,7 +22,7 @@ defmodule Hemdal.Config.Notifier do
 
   use Construct do
     field(:token, :string)
-    field(:type, :string, default: "Slack")
+    field(:module, Hemdal.Config.Module, default: Hemdal.Notifier.Slack)
     field(:username, :string)
     field(:log_level, :string, default: "warn")
     field(:metadata, :map, default: %{})

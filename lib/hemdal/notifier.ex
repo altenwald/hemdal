@@ -129,7 +129,7 @@ defmodule Hemdal.Notifier do
           duration()
         ) :: :ok
   def send(notifier, status, prev, alert, metadata, duration) do
-    notifier_mod = Module.concat([__MODULE__, notifier.type])
+    notifier_mod = notifier.module
     desc = metadata["message"] || @default_desc
     channel = notifier.metadata["channel"] || @default_channel
     username = notifier.username || @default_username

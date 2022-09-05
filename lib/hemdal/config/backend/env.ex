@@ -17,7 +17,7 @@ defmodule Hemdal.Config.Backend.Env do
       enabled: true,
       host: [
         id: "ec8fff22-41c2-4245-8a7b-5157d40c33a7",
-        type: "Local",
+        module: Hemdal.Host.Local,
         name: "localhost"
       ],
       command: [

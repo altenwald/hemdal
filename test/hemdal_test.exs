@@ -15,7 +15,7 @@ defmodule HemdalTest do
         enabled: false,
         host: [
           id: "ec8fff22-41c2-4245-8a7b-5157d40c33a7",
-          type: "Local",
+          module: Hemdal.Host.Local,
           name: "127.0.0.1"
         ],
         command: [
@@ -63,7 +63,7 @@ defmodule HemdalTest do
         enabled: false,
         host: [
           id: "1f694dc3-245a-4d35-b266-85bf126c8bb7",
-          type: "Local",
+          module: Hemdal.Host.Local,
           name: "127.0.0.1"
         ],
         command: [
@@ -103,7 +103,7 @@ defmodule HemdalTest do
         enabled: false,
         host: [
           id: "ec8fff22-41c2-4245-8a7b-5157d40c33a7",
-          type: "Local",
+          module: Hemdal.Host.Local,
           name: "localhost"
         ],
         command: [

@@ -11,6 +11,18 @@ defmodule Hemdal.Notifier.Slack do
   require Logger
   alias Hemdal.Notifier
 
+  @typedoc """
+  Because of an error in Construct, we need to provide the type
+  `t()` for each default value if that's a module or an atom different
+  from `nil`, `true`, `false`:
+
+  https://github.com/ExpressApp/construct/issues/38
+
+  Remove this type when the issue is closed and the code is in use by
+  this library.
+  """
+  @type t() :: module()
+
   plug(Tesla.Middleware.BaseUrl, "https://hooks.slack.com")
   plug(Tesla.Middleware.JSON)
 

@@ -8,6 +8,18 @@ defmodule Hemdal.Host.Local do
   """
   use Hemdal.Host
 
+  @typedoc """
+  Because of an error in Construct, we need to provide the type
+  `t()` for each default value if that's a module or an atom different
+  from `nil`, `true`, `false`:
+
+  https://github.com/ExpressApp/construct/issues/38
+
+  Remove this type when the issue is closed and the code is in use by
+  this library.
+  """
+  @type t() :: module()
+
   @impl Hemdal.Host
   @doc """
   Run locally a command. It's using `System.shell/2` for achieving that.

@@ -304,9 +304,7 @@ defmodule Hemdal.Host do
     {:error, %{"message" => other, "status" => "FAIL"}}
   end
 
-  defp run_in_background(cmd, args, from, %__MODULE__{host: host}) do
-    mod = Module.concat([__MODULE__, host.type])
-
+  defp run_in_background(cmd, args, from, %__MODULE__{host: %_{module: mod} = host}) do
     result =
       mod.transaction(host, fn handler ->
         with {:ok, errorlevel, output} <- exec_cmd(handler, mod, cmd, args),

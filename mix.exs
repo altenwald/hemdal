@@ -68,31 +68,39 @@ defmodule Hemdal.MixProject do
       extras: extras(),
       groups_for_extras: groups_for_extras(),
       groups_for_modules: [
-        "Event Producer/Consumers": [
-          Hemdal.EventManager,
-          Hemdal.EventLogger,
-          Hemdal.EventNotif
-        ],
-        API: [
-          Hemdal.Api.Slack
-        ],
         "Alert/Alarms Logic": [
-          Hemdal.Check,
-          Hemdal.Host.Conn
+          Hemdal,
+          Hemdal.Check
         ],
-        "Web Interface": [
-          Hemdal.CheckChannel,
-          HemdalWeb,
-          HemdalWeb.CheckSocket,
-          HemdalWeb.Endpoint,
-          HemdalWeb.ErrorHelpers,
-          HemdalWeb.ErrorView,
-          HemdalWeb.Gettext,
-          HemdalWeb.LayoutView,
-          HemdalWeb.PageController,
-          HemdalWeb.PageView,
-          HemdalWeb.Router,
-          HemdalWeb.Router.Helpers
+        Configuration: [
+          Hemdal.Config,
+          Hemdal.Config.Alert,
+          Hemdal.Config.Alert.Command,
+          Hemdal.Config.Host,
+          Hemdal.Config.Notifier,
+          Hemdal.Config.Module,
+          Hemdal.Config.Options
+        ],
+        "Configuration Backend": [
+          Hemdal.Config.Backend,
+          Hemdal.Config.Backend.Env,
+          Hemdal.Config.Backend.Json
+        ],
+        Hosts: [
+          Hemdal.Host,
+          Hemdal.Host.Local
+        ],
+        "Event Producer/Consumers": [
+          Hemdal.Event,
+          Hemdal.Event.Log,
+          Hemdal.Event.Notification,
+          Hemdal.Event.Mock
+        ],
+        Notifiers: [
+          Hemdal.Notifier,
+          Hemdal.Notifier.Slack,
+          Hemdal.Notifier.Mattermost,
+          Hemdal.Notifier.Mock
         ]
       ]
     ]

@@ -10,7 +10,7 @@ defmodule Hemdal.CheckTest do
 
       host = [
         id: "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
-        type: "Local",
+        module: Hemdal.Host.Local,
         name: "127.0.0.1",
         max_workers: 1
       ]
@@ -20,7 +20,7 @@ defmodule Hemdal.CheckTest do
           pid: self()
         },
         token: "TOKEN",
-        type: "Mock",
+        module: Hemdal.Notifier.Mock,
         username: "username"
       ]
 

@@ -13,11 +13,10 @@ defmodule Hemdal.ConfigTest do
           name: "valid alert check",
           host: [
             id: "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
-            type: "Local",
-            name: "127.0.0.1",
+            module: Hemdal.Host.Local,
+            name: "localhost",
             max_workers: 1,
-            credential: [
-              id: "5414270f-9752-441b-883e-4b3c1bae5061",
+            options: [
               type: "rsa",
               username: "manuel",
               password: "mysecret"
@@ -34,7 +33,7 @@ defmodule Hemdal.ConfigTest do
                 pid: self()
               },
               token: "TOKEN",
-              type: "Mock",
+              module: Hemdal.Notifier.Mock,
               username: "username"
             ]
           ],
@@ -49,12 +48,14 @@ defmodule Hemdal.ConfigTest do
       assert "aea48656-be08-4576-a2d0-2723458faefd" == alert.id
       assert "valid alert check" == alert.name
 
-      assert %Hemdal.Config.Host{id: "2a8572d4-ceb3-4200-8b29-dd1f21b50e54", type: "Local"} =
-               alert.host
+      assert %Hemdal.Config.Host{
+               id: "2a8572d4-ceb3-4200-8b29-dd1f21b50e54",
+               module: Hemdal.Host.Local
+             } = alert.host
 
       assert %Hemdal.Config.Alert.Command{type: "line"} = alert.command
 
-      assert [%Hemdal.Config.Notifier{type: "Mock"}] = alert.notifiers
+      assert [%Hemdal.Config.Notifier{module: Hemdal.Notifier.Mock}] = alert.notifiers
 
       assert 1 == alert.retries
       assert 60 == alert.check_in_sec
@@ -75,10 +76,10 @@ defmodule Hemdal.ConfigTest do
       [alert] = Hemdal.Config.get_all_alerts()
       assert "2f1cc590-624b-4246-b1d4-2bc97416b321" == alert.id
       assert "single valid check" == alert.name
-      assert %Hemdal.Config.Host{type: "Local"} = alert.host
+      assert %Hemdal.Config.Host{module: Hemdal.Host.Local} = alert.host
       assert %Hemdal.Config.Alert.Command{type: "line"} = alert.command
 
-      assert [%Hemdal.Config.Notifier{type: "Mock"}] = alert.notifiers
+      assert [%Hemdal.Config.Notifier{module: Hemdal.Notifier.Mock}] = alert.notifiers
 
       assert 5 == alert.retries
       assert 60 == alert.check_in_sec

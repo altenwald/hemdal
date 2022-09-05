@@ -10,7 +10,7 @@
     },
     "notifiers": [
       {
-        "type": "Mock",
+        "module": "Hemdal.Notifier.Mock",
         "username": "altenwald",
         "token": "TOKEN"
       }
