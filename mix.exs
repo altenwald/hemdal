@@ -1,7 +1,7 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
-  @version "1.0.0"
+  @version "1.0.1"
 
   def project do
     [
@@ -15,7 +15,10 @@ defmodule Hemdal.MixProject do
       name: "Hemdal",
       description: "Hemdal Alarms/Alerts System",
       docs: docs(),
-      package: package()
+      package: package(),
+      preferred_cli_env: [
+        check: :test
+      ]
     ]
   end
 
@@ -35,7 +38,7 @@ defmodule Hemdal.MixProject do
     [
       {:gen_state_machine, "~> 3.0"},
       {:gen_stage, "~> 1.1"},
-      {:construct, "~> 2.1"},
+      {:construct, "~> 3.0"},
       {:tesla, "~> 1.4"},
       {:jason, "~> 1.3"},
 
@@ -44,7 +47,8 @@ defmodule Hemdal.MixProject do
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:doctor, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.14", only: [:dev, :test], runtime: false},
-      {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false}
+      {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
   end
 

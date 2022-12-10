@@ -197,7 +197,10 @@ defmodule Hemdal.Host do
   @impl GenServer
   @doc false
   def handle_call({:exec, cmd, args}, from, %__MODULE__{max_workers: :infinity} = state) do
-    Logger.debug("host => workers: #{state.workers}/infinity ; launching command #{cmd}")
+    Logger.debug(
+      "host => workers: #{state.workers}/infinity ; queue length: #{length(state.queue)}"
+    )
+
     spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
     {:noreply, %__MODULE__{state | workers: state.workers + 1}}
   end
@@ -209,7 +212,7 @@ defmodule Hemdal.Host do
       )
       when workers >= max_workers do
     Logger.debug(
-      "host => workers: #{max_workers}/#{max_workers} ; queue length: #{length(queue) + 1}"
+      "host => workers: #{workers}/#{max_workers} ; queue length: #{length(queue) + 1}"
     )
 
     {:noreply, %__MODULE__{state | queue: queue ++ [{from, cmd, args}]}}
@@ -261,9 +264,9 @@ defmodule Hemdal.Host do
         {:DOWN, _ref, :process, _pid, _reason},
         %__MODULE__{queue: []} = state
       ) do
-    max_workers = state.max_workers + 1
-    Logger.debug("host => max_workers: #{max_workers} ; queue_len: 0")
-    {:noreply, %__MODULE__{state | max_workers: max_workers}}
+    workers = state.workers - 1
+    Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue_len: 0")
+    {:noreply, %__MODULE__{state | workers: workers}}
   end
 
   def handle_info(
@@ -272,7 +275,11 @@ defmodule Hemdal.Host do
       ) do
     state = %__MODULE__{state | queue: queue}
     spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
-    Logger.debug("host => max_workers: #{state.max_workers} ; queue_len: #{length(queue)}")
+
+    Logger.debug(
+      "host => workers: #{state.workers}/#{state.max_workers} ; queue_len: #{length(queue)}"
+    )
+
     {:noreply, state}
   end
 
