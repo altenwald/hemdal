@@ -27,7 +27,7 @@ defmodule Hemdal do
   following ones:
 
   - `Local`, included with core.
-  - `[Trooper](https://github.com/altenwald/hemdal_trooper)` uses
+  - [`Trooper`](https://github.com/altenwald/hemdal_trooper) uses
     [Trooper](https://github.com/army-cat/trooper) to connect via SSH to the
     remote servers.
 

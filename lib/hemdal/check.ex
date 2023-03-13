@@ -76,10 +76,7 @@ defmodule Hemdal.Check do
   """
   @spec get_pid(alert_id()) :: pid() | nil
   def get_pid(alert_id) do
-    case Registry.lookup(Hemdal.Check.Registry, alert_id) do
-      [{pid, nil}] -> pid
-      [] -> nil
-    end
+    GenServer.whereis(via(alert_id))
   end
 
   @doc """
@@ -136,9 +133,9 @@ defmodule Hemdal.Check do
   """
   @spec update_alert(Hemdal.Config.Alert.t()) :: {:ok, pid()}
   def update_alert(alert) do
-    if exists?(alert.id) do
-      GenStateMachine.cast(via(alert.id), {:update, alert})
-      {:ok, get_pid(alert.id)}
+    if pid = get_pid(alert.id) do
+      GenStateMachine.cast(pid, {:update, alert})
+      {:ok, pid}
     else
       start(alert)
     end
@@ -337,6 +334,7 @@ defmodule Hemdal.Check do
     case perform_check(alert) do
       {:ok, status} ->
         t = ellapsed(state.fail_started)
+        now = NaiveDateTime.utc_now()
 
         Event.notify(%Event{
           alert: alert,
@@ -344,17 +342,18 @@ defmodule Hemdal.Check do
           prev_status: :warn,
           fail_started: state.fail_started,
           fail_duration: t,
-          last_update: NaiveDateTime.utc_now(),
+          last_update: now,
           metadata: status
         })
 
         timeout = alert.check_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
-        state = %__MODULE__{state | status: status, last_update: NaiveDateTime.utc_now()}
+        state = %__MODULE__{state | status: status, last_update: now}
         {:next_state, :normal, state, actions}
 
       {:error, error} ->
         t = ellapsed(state.fail_started)
+        now = NaiveDateTime.utc_now()
 
         Event.notify(%Event{
           alert: alert,
@@ -362,7 +361,7 @@ defmodule Hemdal.Check do
           prev_status: :warn,
           fail_started: state.fail_started,
           fail_duration: t,
-          last_update: NaiveDateTime.utc_now(),
+          last_update: now,
           metadata: error
         })
 
@@ -372,7 +371,7 @@ defmodule Hemdal.Check do
 
         timeout = alert.broken_recheck_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
-        state = %__MODULE__{state | status: error, last_update: NaiveDateTime.utc_now()}
+        state = %__MODULE__{state | status: error, last_update: now}
         {:next_state, :broken, state, actions}
     end
   end
@@ -381,6 +380,7 @@ defmodule Hemdal.Check do
     case perform_check(alert) do
       {:ok, status} ->
         t = ellapsed(state.fail_started)
+        now = NaiveDateTime.utc_now()
 
         Event.notify(%Event{
           alert: alert,
@@ -388,17 +388,18 @@ defmodule Hemdal.Check do
           prev_status: :warn,
           fail_started: state.fail_started,
           fail_duration: t,
-          last_update: NaiveDateTime.utc_now(),
+          last_update: now,
           metadata: status
         })
 
         timeout = alert.check_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
-        state = %__MODULE__{state | status: status, last_update: NaiveDateTime.utc_now()}
+        state = %__MODULE__{state | status: status, last_update: now}
         {:next_state, :normal, state, actions}
 
       {:error, error} ->
         t = ellapsed(state.fail_started)
+        now = NaiveDateTime.utc_now()
 
         Event.notify(%Event{
           alert: alert,
@@ -406,7 +407,7 @@ defmodule Hemdal.Check do
           prev_status: :warn,
           fail_started: state.fail_started,
           fail_duration: t,
-          last_update: NaiveDateTime.utc_now(),
+          last_update: now,
           metadata: error
         })
 
@@ -416,7 +417,7 @@ defmodule Hemdal.Check do
         state = %__MODULE__{
           state
           | retries: state.retries - 1,
-            last_update: NaiveDateTime.utc_now()
+            last_update: now
         }
 
         {:keep_state, state, actions}
@@ -432,6 +433,7 @@ defmodule Hemdal.Check do
   def broken(:cast, {:update, %Alert{enabled: false} = alert}, state) do
     state = %__MODULE__{state | alert: alert, last_update: NaiveDateTime.utc_now()}
     t = ellapsed(state.fail_started)
+    now = NaiveDateTime.utc_now()
 
     Event.notify(%Event{
       alert: alert,
@@ -439,7 +441,7 @@ defmodule Hemdal.Check do
       prev_status: :error,
       fail_started: state.fail_started,
       fail_duration: t,
-      last_update: NaiveDateTime.utc_now(),
+      last_update: now,
       metadata: @metadata_disabled
     })
 
@@ -454,6 +456,7 @@ defmodule Hemdal.Check do
     case perform_check(alert) do
       {:ok, status} ->
         t = ellapsed(state.fail_started)
+        now = NaiveDateTime.utc_now()
 
         Event.notify(%Event{
           alert: alert,
@@ -461,7 +464,7 @@ defmodule Hemdal.Check do
           prev_status: :error,
           fail_started: state.fail_started,
           fail_duration: t,
-          last_update: NaiveDateTime.utc_now(),
+          last_update: now,
           metadata: status
         })
 
@@ -469,11 +472,12 @@ defmodule Hemdal.Check do
 
         timeout = alert.check_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
-        state = %__MODULE__{state | status: status, last_update: NaiveDateTime.utc_now()}
+        state = %__MODULE__{state | status: status, last_update: now}
         {:next_state, :normal, state, actions}
 
       {:error, error} ->
         t = ellapsed(state.fail_started)
+        now = NaiveDateTime.utc_now()
 
         Event.notify(%Event{
           alert: alert,
@@ -481,13 +485,13 @@ defmodule Hemdal.Check do
           prev_status: :error,
           fail_started: state.fail_started,
           fail_duration: t,
-          last_update: NaiveDateTime.utc_now(),
+          last_update: now,
           metadata: error
         })
 
         timeout = alert.broken_recheck_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]
-        state = %__MODULE__{state | status: error, last_update: NaiveDateTime.utc_now()}
+        state = %__MODULE__{state | status: error, last_update: now}
         {:keep_state, state, actions}
     end
   end

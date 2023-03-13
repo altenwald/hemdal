@@ -10,7 +10,6 @@ defmodule Hemdal.MixProject do
       elixir: "~> 1.10",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      aliases: aliases(),
       deps: deps(),
       name: "Hemdal",
       description: "Hemdal Alarms/Alerts System",
@@ -25,8 +24,7 @@ defmodule Hemdal.MixProject do
   def application do
     [
       mod: {Hemdal.Application, []},
-      extra_applications: [:logger, :runtime_tools],
-      start_phases: [load_checks: []]
+      extra_applications: [:logger, :runtime_tools]
     ]
   end
 
@@ -49,17 +47,6 @@ defmodule Hemdal.MixProject do
       {:ex_check, "~> 0.14", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false}
-    ]
-  end
-
-  defp aliases do
-    [
-      release: [
-        "clean",
-        "deps.get",
-        "compile",
-        "release"
-      ]
     ]
   end
 

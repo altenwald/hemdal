@@ -25,15 +25,4 @@ defmodule Hemdal.Application do
     opts = [strategy: :one_for_one, name: Hemdal.Supervisor]
     Supervisor.start_link(children, opts)
   end
-
-  @impl Application
-  if Mix.env() == :test do
-    def start_phase(:load_checks, :normal, _args), do: :ok
-  else
-    def start_phase(:load_checks, :normal, _args) do
-      Hemdal.Host.start_all()
-      Hemdal.Check.start_all()
-      :ok
-    end
-  end
 end

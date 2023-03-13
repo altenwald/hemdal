@@ -92,10 +92,8 @@ defmodule Hemdal.Host do
   """
   @spec exists?(host_id()) :: boolean()
   def exists?(host_id) do
-    case Registry.lookup(@registry_name, host_id) do
-      [{_pid, nil}] -> true
-      [] -> false
-    end
+    pid = GenServer.whereis(via(host_id))
+    is_pid(pid) and Process.alive?(pid)
   end
 
   @typedoc false
@@ -129,12 +127,9 @@ defmodule Hemdal.Host do
   @doc """
   Retrieve the PID providing the host ID.
   """
-  @spec get_pid(host_id()) :: pid()
+  @spec get_pid(host_id()) :: pid() | nil
   def get_pid(host_id) do
-    case Registry.lookup(@registry_name, host_id) do
-      [{pid, nil}] -> pid
-      [] -> nil
-    end
+    GenServer.whereis(via(host_id))
   end
 
   @doc """
@@ -168,9 +163,9 @@ defmodule Hemdal.Host do
   """
   @spec update_host(Hemdal.Config.Host.t()) :: {:ok, pid()}
   def update_host(host) do
-    if exists?(host.id) do
-      GenStateMachine.cast(via(host.id), {:update, host})
-      {:ok, get_pid(host.id)}
+    if pid = get_pid(host.id) do
+      GenStateMachine.cast(pid, {:update, host})
+      {:ok, pid}
     else
       start(host)
     end
