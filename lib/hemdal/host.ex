@@ -239,7 +239,12 @@ defmodule Hemdal.Host do
         {:noreply, %__MODULE__{host: host, max_workers: new_max_workers}}
 
       {new_max_workers, _old_max_workers} ->
-        state = launch_extra(%__MODULE__{state | host: host, max_workers: new_max_workers}, Queue.is_empty(state.queue))
+        state =
+          launch_extra(
+            %__MODULE__{state | host: host, max_workers: new_max_workers},
+            Queue.is_empty(state.queue)
+          )
+
         {:noreply, state}
     end
   end
