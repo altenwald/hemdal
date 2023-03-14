@@ -266,7 +266,7 @@ defmodule Hemdal.Host do
     case Queue.out(state.queue) do
       {:empty, _} ->
         workers = state.workers - 1
-        Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue_len: 0")
+        Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue length: 0")
         {:noreply, %__MODULE__{state | workers: workers}}
 
       {{:value, {from, cmd, args}}, queue} ->
@@ -274,7 +274,7 @@ defmodule Hemdal.Host do
         spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
 
         Logger.debug(
-          "host => workers: #{state.workers}/#{state.max_workers} ; queue_len: #{Queue.len(queue)}"
+          "host => workers: #{state.workers}/#{state.max_workers} ; queue length: #{Queue.len(queue)}"
         )
 
         {:noreply, state}
