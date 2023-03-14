@@ -55,6 +55,7 @@ defmodule Hemdal.Host do
   use GenServer, restart: :transient
   require Logger
   alias Hemdal.Config.Alert.Command
+  alias :queue, as: Queue
 
   @default_temporal_dir "/tmp"
   @default_shell "/bin/bash"
@@ -175,13 +176,13 @@ defmodule Hemdal.Host do
           host: nil | Hemdal.Config.Host.t(),
           max_workers: :infinity | non_neg_integer(),
           workers: non_neg_integer(),
-          queue: [{GenServer.from(), command(), command_args()}]
+          queue: Queue.queue({GenServer.from(), command(), command_args()})
         }
 
   defstruct host: nil,
             max_workers: :infinity,
             workers: 0,
-            queue: []
+            queue: Queue.new()
 
   @impl GenServer
   @doc false
@@ -193,7 +194,7 @@ defmodule Hemdal.Host do
   @doc false
   def handle_call({:exec, cmd, args}, from, %__MODULE__{max_workers: :infinity} = state) do
     Logger.debug(
-      "host => workers: #{state.workers}/infinity ; queue length: #{length(state.queue)}"
+      "host => workers: #{state.workers}/infinity ; queue length: #{Queue.len(state.queue)}"
     )
 
     spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
@@ -207,10 +208,10 @@ defmodule Hemdal.Host do
       )
       when workers >= max_workers do
     Logger.debug(
-      "host => workers: #{workers}/#{max_workers} ; queue length: #{length(queue) + 1}"
+      "host => workers: #{workers}/#{max_workers} ; queue length: #{Queue.len(queue) + 1}"
     )
 
-    {:noreply, %__MODULE__{state | queue: queue ++ [{from, cmd, args}]}}
+    {:noreply, %__MODULE__{state | queue: Queue.in({from, cmd, args}, queue)}}
   end
 
   def handle_call({:exec, cmd, args}, from, state) do
@@ -218,7 +219,7 @@ defmodule Hemdal.Host do
     workers = state.workers + 1
 
     Logger.debug(
-      "host => workers: #{workers}/#{state.max_workers} ; queue length: #{length(state.queue)}"
+      "host => workers: #{workers}/#{state.max_workers} ; queue length: #{Queue.len(state.queue)}"
     )
 
     {:noreply, %__MODULE__{state | workers: workers}}
@@ -238,44 +239,41 @@ defmodule Hemdal.Host do
         {:noreply, %__MODULE__{host: host, max_workers: new_max_workers}}
 
       {new_max_workers, _old_max_workers} ->
-        state = launch_extra(%__MODULE__{state | host: host, max_workers: new_max_workers})
+        state = launch_extra(%__MODULE__{state | host: host, max_workers: new_max_workers}, Queue.is_empty(state.queue))
         {:noreply, state}
     end
   end
 
-  defp launch_extra(%__MODULE__{queue: []} = state), do: state
+  defp launch_extra(state, true), do: state
 
-  defp launch_extra(%__MODULE__{workers: max_workers, max_workers: max_workers} = state),
+  defp launch_extra(%__MODULE__{workers: max_workers, max_workers: max_workers} = state, false),
     do: state
 
-  defp launch_extra(%__MODULE__{queue: [{from, cmd, args} | queue]} = state) do
+  defp launch_extra(state, false) do
+    {{:value, {from, cmd, args}}, queue} = Queue.out(state.queue)
     {:noreply, state} = handle_call({:exec, cmd, args}, from, %__MODULE__{state | queue: queue})
-    launch_extra(state)
+    launch_extra(state, Queue.is_empty(state.queue))
   end
 
   @impl GenServer
   @doc false
-  def handle_info(
-        {:DOWN, _ref, :process, _pid, _reason},
-        %__MODULE__{queue: []} = state
-      ) do
-    workers = state.workers - 1
-    Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue_len: 0")
-    {:noreply, %__MODULE__{state | workers: workers}}
-  end
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+    case Queue.out(state.queue) do
+      {:empty, _} ->
+        workers = state.workers - 1
+        Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue_len: 0")
+        {:noreply, %__MODULE__{state | workers: workers}}
 
-  def handle_info(
-        {:DOWN, _ref, :process, _pid, _reason},
-        %__MODULE__{queue: [{from, cmd, args} | queue]} = state
-      ) do
-    state = %__MODULE__{state | queue: queue}
-    spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
+      {{:value, {from, cmd, args}}, queue} ->
+        state = %__MODULE__{state | queue: queue}
+        spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
 
-    Logger.debug(
-      "host => workers: #{state.workers}/#{state.max_workers} ; queue_len: #{length(queue)}"
-    )
+        Logger.debug(
+          "host => workers: #{state.workers}/#{state.max_workers} ; queue_len: #{Queue.len(queue)}"
+        )
 
-    {:noreply, state}
+        {:noreply, state}
+    end
   end
 
   defp run_result(data, 2, "FAIL"), do: {:error, Map.put(data, "status", "FAIL")}
