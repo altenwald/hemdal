@@ -24,7 +24,12 @@ defmodule Hemdal.MixProject do
   def application do
     [
       mod: {Hemdal.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools],
+      start_phases: [
+        preload_checks: [],
+        load_checks: [],
+        postload_checks: []
+      ]
     ]
   end
 
