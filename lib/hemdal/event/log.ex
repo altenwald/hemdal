@@ -45,7 +45,7 @@ defmodule Hemdal.Event.Log do
 
     case event.status do
       :ok -> Logger.info(message)
-      :warn -> Logger.warn(message)
+      :warn -> Logger.warning(message)
       :error -> Logger.error(message)
     end
 

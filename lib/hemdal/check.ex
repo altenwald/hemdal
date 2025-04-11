@@ -278,7 +278,7 @@ defmodule Hemdal.Check do
           metadata: error
         })
 
-        Logger.warn(
+        Logger.warning(
           "[#{alert.id}] starting to fail [#{alert.name}] for " <>
             "[#{alert.host.name}]: #{inspect(error)}"
         )
