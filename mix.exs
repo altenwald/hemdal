@@ -1,7 +1,7 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
-  @version "1.0.2"
+  @version "1.0.3"
 
   def project do
     [
@@ -15,8 +15,17 @@ defmodule Hemdal.MixProject do
       description: "Hemdal Alarms/Alerts System",
       docs: docs(),
       package: package(),
+      test_coverage: coverage(),
       preferred_cli_env: [
         check: :test
+      ]
+    ]
+  end
+
+  defp coverage do
+    [
+      ignore_modules: [
+        Hemdal.Host.Supervisor
       ]
     ]
   end

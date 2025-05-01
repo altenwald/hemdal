@@ -84,7 +84,6 @@ defmodule Hemdal.Host do
   """
   @spec start_link([Hemdal.Config.Host.t()]) :: {:ok, pid()}
   def start_link([host]) do
-    Logger.info("starting #{host.id} - #{host.name}")
     {:ok, _pid} = GenServer.start_link(__MODULE__, [host], name: via(host.id))
   end
 
@@ -141,8 +140,14 @@ defmodule Hemdal.Host do
   """
   @spec reload_all() :: :ok
   def reload_all do
-    Hemdal.Config.get_all_hosts()
-    |> Enum.each(&update_host/1)
+    config_hosts = Hemdal.Config.get_all_hosts()
+    Enum.each(config_hosts, &update_host/1)
+
+    config_ids = Enum.map(config_hosts, & &1.id)
+    running_ids = get_all()
+
+    (running_ids -- config_ids)
+    |> Enum.each(&stop/1)
   end
 
   @doc """
@@ -154,6 +159,29 @@ defmodule Hemdal.Host do
   def start_all do
     Hemdal.Config.get_all_hosts()
     |> Enum.each(&start/1)
+  end
+
+  @doc """
+  Get all the host IDs that are running at the moment of calling this function.
+  """
+  @spec get_all() :: [host_id()]
+  def get_all do
+    @registry_name
+    |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> Enum.filter(fn {_key, pid} -> is_pid(pid) and Process.alive?(pid) end)
+    |> Enum.map(fn {key, _pid} -> key end)
+    |> Enum.sort()
+  end
+
+  @doc """
+  Terminate the processes related to a process ID.
+  """
+  @spec stop(host_id()) :: :ok
+  def stop(host_id) do
+    Registry.lookup(@registry_name, host_id)
+    |> Enum.each(fn {pid, _value} ->
+      DynamicSupervisor.terminate_child(@sup_name, pid)
+    end)
   end
 
   @doc """
@@ -187,6 +215,7 @@ defmodule Hemdal.Host do
   @impl GenServer
   @doc false
   def init([host]) do
+    Logger.info("[#{inspect(self())}] starting #{host.id} - #{host.name}")
     {:ok, %__MODULE__{host: host, max_workers: host.max_workers}}
   end
 

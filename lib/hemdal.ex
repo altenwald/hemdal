@@ -64,7 +64,7 @@ defmodule Hemdal do
   linked to the checks, see `Hemdal.Check` for further information.
 
   The events could be implemented via `GenStage`. See `Hemdal.Event` for
-  futher information.
+  further information.
 
   ## Notification
 
@@ -75,7 +75,7 @@ defmodule Hemdal do
   - `Hemdal.Notifier.Slack` is sending the event to a Slack webhook.
   - `Hemdal.Notifier.Mattermost` is sending the even to a Mattermost webhook.
 
-  See `Hemdal.Notifier` for futher information.
+  See `Hemdal.Notifier` for further information.
   """
 
   @doc """
