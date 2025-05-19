@@ -398,6 +398,10 @@ defmodule Hemdal.Host do
     end
   end
 
+  defp exec_cmd(handler, mod, %Command{type: "interactive", command: command}, [pid]) do
+    mod.exec_interactive(handler, command, pid)
+  end
+
   @typedoc """
   Handler is used by the backend implementation of the host, it could be
   whatever depending on the needs of the backend implementation. For
@@ -452,10 +456,18 @@ defmodule Hemdal.Host do
 
   @doc """
   Exec a command using the method implemented by the module where it's
-  implemented. The `exec/2` command is getting a handler from the transaction
+  implemented. The `c:exec/2` command is getting a handler from the transaction
   and the command to be executed as a string.
   """
   @callback exec(handler(), command()) :: {:ok, errorlevel(), output()} | {:error, reason()}
+
+  @doc """
+  Exec an interactive command implemented by the module where it's
+  implemented. The `c:exec_interactive/3` command is getting a handler from the
+  transaction and the command to be executed as a string.
+  """
+  @callback exec_interactive(handler(), command(), pid()) ::
+              {:ok, errorlevel(), output()} | {:error, reason()}
 
   @doc """
   Write a file in the remote (or local) host. It's intended to write the
@@ -466,7 +478,7 @@ defmodule Hemdal.Host do
 
   @doc """
   Remove a file which was created with `write_file/3` when the execution of
-  the script was finalised.
+  the script was finalized.
   """
   @callback delete(handler(), tpm_file :: charlist()) :: :ok | {:error, reason()}
 

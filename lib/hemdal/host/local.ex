@@ -18,6 +18,38 @@ defmodule Hemdal.Host.Local do
   end
 
   @impl Hemdal.Host
+  def exec_interactive(_opts, command, pid) do
+    port = Port.open({:spawn, command}, [:binary])
+    send(pid, {:start, self()})
+    get_and_send_all(port, pid, "")
+  end
+
+  defp get_and_send_all(port, pid, output) do
+    receive do
+      {:data, data} ->
+        send(port, {self(), {:command, data}})
+        get_and_send_all(port, pid, output)
+
+      :close ->
+        send(port, {self(), :close})
+        get_and_send_all(port, pid, output)
+
+      {^port, {:data, data}} ->
+        send(pid, {:continue, data})
+        get_and_send_all(port, pid, output <> data)
+
+      {^port, :closed} ->
+        send(pid, :closed)
+        {:ok, 0, output}
+    after
+      60_000 ->
+        Port.close(port)
+        send(pid, :closed)
+        {:ok, 127, output}
+    end
+  end
+
+  @impl Hemdal.Host
   @doc """
   Write a file locally, the file is intended to be located in a temporal
   location, if the file exists previously it will fail ensuring it's not

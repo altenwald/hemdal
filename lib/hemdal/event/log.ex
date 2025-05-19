@@ -57,11 +57,11 @@ defmodule Hemdal.Event.Log do
   end
 
   defp get_message(event, :ok, :ok) do
-    "sucessful run #{event.alert.name} on #{event.alert.host.name}"
+    "successful run #{event.alert.name} on #{event.alert.host.name}"
   end
 
   defp get_message(event, :ok, :warn) do
-    "sucessful again run #{event.alert.name} on #{event.alert.host.name} after #{event.fail_duration || "unknown"} sec"
+    "successful again run #{event.alert.name} on #{event.alert.host.name} after #{event.fail_duration || "unknown"} sec"
   end
 
   defp get_message(event, :ok, :error) do

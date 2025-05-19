@@ -44,10 +44,11 @@ defmodule Hemdal.Config.Alert do
       each alert. The data used is:
 
       - `name` the name of the script.
-      - `type` the type of the script could be `line` or `script`. The first
-        one let us define a command in a single line and the last one let us
-        define a script, a multi-line code which will be copied and executed
-        in the host.
+      - `type` the type of the script could be `line`, `script` or
+        `interactive`. The first one let us define a command in a single line,
+        the last one let us define a script, a multi-line code which will be
+        copied and executed in the host, and the last one let us run a command
+        interacting with a process for providing information in runtime.
       - `command` as the command line to be executed. It could be only one line
         or a multi-line script.
       """

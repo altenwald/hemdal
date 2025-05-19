@@ -95,4 +95,45 @@ defmodule Hemdal.HostTest do
       78eb75f9-2ac7-434c-a1a2-330b23c89982
     ] == Hemdal.Host.get_all()
   end
+
+  test "run shell command" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Alert.Command{
+      name: "hello world!",
+      type: "line",
+      command: ~s|echo '{"status": "OK", "message": "hello world!"}'|
+    }
+
+    assert {:ok, %{"message" => "hello world!"}} = Hemdal.Host.exec(host_id, echo, [])
+  end
+
+  test "run interactive shell command" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Alert.Command{
+      name: "hello world!",
+      type: "interactive",
+      command: "cat"
+    }
+
+    pid =
+      spawn_link(fn ->
+        pid =
+          receive do
+            {:start, pid} -> pid
+          end
+
+        send(pid, {:data, ~s|{"status": "OK",\n|})
+        assert_receive {:continue, ~s|{"status": "OK",\n|}
+        send(pid, {:data, ~s| "message": "hello world!"}\n|})
+        assert_receive {:continue, ~s| "message": "hello world!"}\n|}
+        send(pid, :close)
+        assert_receive :closed
+      end)
+
+    assert {:ok, %{"message" => "hello world!"}} = Hemdal.Host.exec(host_id, echo, [pid])
+  end
 end
