@@ -40,6 +40,12 @@ defmodule Hemdal.HostTest do
     refute Hemdal.Host.exists?(host.id)
   end
 
+  test "start all & stop all" do
+    assert [] == Hemdal.Host.get_all()
+    assert :ok == Hemdal.Host.start_all()
+    refute [] == Hemdal.Host.get_all()
+  end
+
   test "get all hosts" do
     host = Hemdal.Config.get_host_by_id!("78eb75f9-2ac7-434c-a1a2-330b23c89982")
 
@@ -106,7 +112,64 @@ defmodule Hemdal.HostTest do
       command: ~s|echo '{"status": "OK", "message": "hello world!"}'|
     }
 
-    assert {:ok, %{"message" => "hello world!"}} = Hemdal.Host.exec(host_id, echo, [])
+    assert {:ok, %{"message" => "hello world!"}} = Hemdal.Host.exec(host_id, echo)
+  end
+
+  test "run background shell command" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Alert.Command{
+      name: "hello world!",
+      type: "line",
+      command: ~s|echo '{"status": "OK", "message": "hello world!"}'|
+    }
+
+    assert {:ok, {pid, ref}} = Hemdal.Host.exec_background(host_id, echo)
+    assert is_pid(pid)
+    assert is_reference(ref)
+    assert_receive {:ok, %{"message" => "hello world!"}}, 5_000
+  end
+
+  test "run script" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Alert.Command{
+      name: "hello world!",
+      type: "script",
+      command: """
+      #!/bin/bash
+
+      MESSAGE="Hello World!"
+      STATUS="OK"
+
+      echo '{"status": "'$STATUS'", "message": "'$MESSAGE'"}'
+      """
+    }
+
+    assert {:ok, %{"message" => "Hello World!"}} = Hemdal.Host.exec(host_id, echo)
+  end
+
+  test "run background script" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Alert.Command{
+      name: "hello world!",
+      type: "script",
+      command: """
+      #!/bin/bash
+
+      MESSAGE="Hello World!"
+      STATUS="OK"
+
+      echo '{"status": "'$STATUS'", "message": "'$MESSAGE'"}'
+      """
+    }
+
+    assert {:ok, {_pid, _ref}} = Hemdal.Host.exec_background(host_id, echo)
+    assert_receive {:ok, %{"message" => "Hello World!"}}, 5_000
   end
 
   test "run interactive shell command" do
@@ -121,11 +184,7 @@ defmodule Hemdal.HostTest do
 
     pid =
       spawn_link(fn ->
-        pid =
-          receive do
-            {:start, pid} -> pid
-          end
-
+        assert_receive {:start, pid}
         send(pid, {:data, ~s|{"status": "OK",\n|})
         assert_receive {:continue, ~s|{"status": "OK",\n|}
         send(pid, {:data, ~s| "message": "hello world!"}\n|})

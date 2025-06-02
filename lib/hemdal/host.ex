@@ -120,8 +120,35 @@ defmodule Hemdal.Host do
   """
   @spec exec(host_id(), Hemdal.Config.Alert.Command.t(), command_args()) ::
           {:ok, map()} | {:error, map()}
-  def exec(host_id, cmd, args) do
-    GenServer.call(via(host_id), {:exec, cmd, args}, @timeout_exec)
+  @spec exec(host_id(), Hemdal.Config.Alert.Command.t(), command_args(), timeout()) ::
+          {:ok, map()} | {:error, map()}
+  def exec(host_id, cmd, args \\ [], timeout \\ @timeout_exec)
+
+  def exec(host_id, %Command{type: "line"} = cmd, _args, timeout) do
+    GenServer.call(via(host_id), {:exec, cmd, []}, timeout)
+  end
+
+  def exec(host_id, %Command{type: "script"} = cmd, args, timeout) do
+    GenServer.call(via(host_id), {:exec, cmd, args}, timeout)
+  end
+
+  def exec(host_id, %Command{type: "interactive"} = cmd, [pid], timeout) do
+    GenServer.call(via(host_id), {:exec, cmd, [pid]}, timeout)
+  end
+
+  @doc """
+  Run or execute the command passed as parameter. It's needed to pass the host ID
+  to find the process where to send the request, and the the command and the
+  arguments to run the command.
+
+  It's returning a tuple for `:ok` or `:error`. The `:ok` tuple have a PID to know
+  which process is in charge of running the background process and to know if it's
+  still running or not.
+  """
+  @spec exec_background(host_id(), Hemdal.Config.Alert.Command.t(), command_args()) ::
+          {:ok, pid()} | {:error, any()}
+  def exec_background(host_id, cmd, args \\ []) do
+    GenServer.call(via(host_id), {:exec_background, self(), cmd, args}, @timeout_exec)
   end
 
   @doc """
@@ -221,12 +248,49 @@ defmodule Hemdal.Host do
 
   @impl GenServer
   @doc false
+  def handle_call({:exec_background, pid, cmd, args}, _from, %__MODULE__{max_workers: :infinity} = state) do
+    Logger.debug(
+      "host => workers: #{state.workers}/infinity ; queue length: #{Queue.len(state.queue)}"
+    )
+
+    send_result = &send(pid, &1)
+    ref = spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
+    {:reply, {:ok, ref}, %__MODULE__{state | workers: state.workers + 1}}
+  end
+
+  def handle_call(
+        {:exec_background, pid, cmd, args},
+        from,
+        %__MODULE__{max_workers: max_workers, workers: workers, queue: queue} = state
+      )
+      when workers >= max_workers do
+    Logger.debug(
+      "host => workers: #{workers}/#{max_workers} ; queue length: #{Queue.len(queue) + 1}"
+    )
+
+    queue = Queue.in({{:exec_background, pid, cmd, args}, from}, queue)
+    {:noreply, %__MODULE__{state | queue: queue}}
+  end
+
+  def handle_call({:exec_background, pid, cmd, args}, _from, state) do
+    send_result = &send(pid, &1)
+    ref = spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
+    workers = state.workers + 1
+
+    Logger.debug(
+      "host => workers: #{workers}/#{state.max_workers} ; queue length: #{Queue.len(state.queue)}"
+    )
+
+    {:reply, {:ok, ref}, %__MODULE__{state | workers: workers}}
+  end
+
   def handle_call({:exec, cmd, args}, from, %__MODULE__{max_workers: :infinity} = state) do
     Logger.debug(
       "host => workers: #{state.workers}/infinity ; queue length: #{Queue.len(state.queue)}"
     )
 
-    spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
+    send_result = &GenServer.reply(from, &1)
+    spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
     {:noreply, %__MODULE__{state | workers: state.workers + 1}}
   end
 
@@ -240,11 +304,13 @@ defmodule Hemdal.Host do
       "host => workers: #{workers}/#{max_workers} ; queue length: #{Queue.len(queue) + 1}"
     )
 
-    {:noreply, %__MODULE__{state | queue: Queue.in({from, cmd, args}, queue)}}
+    queue = Queue.in({{:exec, cmd, args}, from}, queue)
+    {:noreply, %__MODULE__{state | queue: queue}}
   end
 
   def handle_call({:exec, cmd, args}, from, state) do
-    spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
+    send_result = &GenServer.reply(from, &1)
+    spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
     workers = state.workers + 1
 
     Logger.debug(
@@ -259,13 +325,13 @@ defmodule Hemdal.Host do
   def handle_cast({:update, host}, state) do
     case {host.max_workers, state.host.max_workers} do
       {max_workers, max_workers} ->
-        {:noreply, %__MODULE__{host: host}}
+        {:noreply, %__MODULE__{state | host: host}}
 
       {:infinity, _} ->
-        {:noreply, %__MODULE__{host: host, max_workers: :infinity}}
+        {:noreply, %__MODULE__{state | host: host, max_workers: :infinity}}
 
       {new_max_workers, old_max_workers} when new_max_workers < old_max_workers ->
-        {:noreply, %__MODULE__{host: host, max_workers: new_max_workers}}
+        {:noreply, %__MODULE__{state | host: host, max_workers: new_max_workers}}
 
       {new_max_workers, _old_max_workers} ->
         state =
@@ -284,8 +350,8 @@ defmodule Hemdal.Host do
     do: state
 
   defp launch_extra(state, false) do
-    {{:value, {from, cmd, args}}, queue} = Queue.out(state.queue)
-    {:noreply, state} = handle_call({:exec, cmd, args}, from, %__MODULE__{state | queue: queue})
+    {{:value, {info, from}}, queue} = Queue.out(state.queue)
+    {:noreply, state} = handle_call(info, from, %__MODULE__{state | queue: queue})
     launch_extra(state, Queue.is_empty(state.queue))
   end
 
@@ -298,9 +364,10 @@ defmodule Hemdal.Host do
         Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue length: 0")
         {:noreply, %__MODULE__{state | workers: workers}}
 
-      {{:value, {from, cmd, args}}, queue} ->
+      {{:value, {{:exec, cmd, args}, from}}, queue} ->
         state = %__MODULE__{state | queue: queue}
-        spawn_monitor(fn -> run_in_background(cmd, args, from, state) end)
+        send_result = &GenServer.reply(from, &1)
+        spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
 
         Logger.debug(
           "host => workers: #{state.workers}/#{state.max_workers} ; queue length: #{Queue.len(queue)}"
@@ -338,19 +405,20 @@ defmodule Hemdal.Host do
     {:error, %{"message" => other, "status" => "FAIL"}}
   end
 
-  defp run_in_background(cmd, args, from, %__MODULE__{host: %_{module: mod} = host}) do
-    result =
-      mod.transaction(host, fn handler ->
-        with {:ok, errorlevel, output} <- exec_cmd(handler, mod, cmd, args),
-             {:ok, %{"status" => status} = data} <- decode(output) do
-          Logger.debug("command exit(#{errorlevel}) output: #{inspect(data)}")
-          run_result(data, errorlevel, status)
-        else
-          other -> other
-        end
-      end)
+  defp run_in_background(cmd, args, send_result, %__MODULE__{host: %_{module: mod} = host}) do
+    mod.transaction(host, fn handler ->
+      with {:ok, errorlevel, output} <- exec_cmd(handler, mod, cmd, args),
+            {:ok, %{"status" => status} = data} <- decode(output) do
+        Logger.debug("command exit(#{errorlevel}) output: #{inspect(data)}")
+        run_result(data, errorlevel, status)
+      else
+        other -> other
+      end
+    end)
+    |> final_run_result()
+    |> send_result.()
 
-    :ok = GenServer.reply(from, final_run_result(result))
+    :ok
   end
 
   defp decode(output) do
