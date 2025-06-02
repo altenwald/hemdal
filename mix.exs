@@ -1,7 +1,7 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
-  @version "1.0.5"
+  @version "1.1.0"
 
   def project do
     [
@@ -82,7 +82,7 @@ defmodule Hemdal.MixProject do
         Configuration: [
           Hemdal.Config,
           Hemdal.Config.Alert,
-          Hemdal.Config.Alert.Command,
+          Hemdal.Config.Command,
           Hemdal.Config.Host,
           Hemdal.Config.Notifier,
           Hemdal.Config.Module,

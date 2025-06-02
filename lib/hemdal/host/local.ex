@@ -18,10 +18,10 @@ defmodule Hemdal.Host.Local do
   end
 
   @impl Hemdal.Host
-  def exec_interactive(_opts, command, pid) do
+  def exec_interactive(_opts, command, caller) when is_pid(caller) do
     port = Port.open({:spawn, command}, [:binary])
-    send(pid, {:start, self()})
-    get_and_send_all(port, pid, "")
+    send(caller, {:start, self()})
+    get_and_send_all(port, caller, "")
   end
 
   defp get_and_send_all(port, pid, output) do

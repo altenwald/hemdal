@@ -106,7 +106,7 @@ defmodule Hemdal.HostTest do
     assert :ok = Hemdal.Host.reload_all()
     assert [host_id, _] = Hemdal.Host.get_all()
 
-    echo = %Hemdal.Config.Alert.Command{
+    echo = %Hemdal.Config.Command{
       name: "hello world!",
       type: "line",
       command: ~s|echo '{"status": "OK", "message": "hello world!"}'|
@@ -119,15 +119,14 @@ defmodule Hemdal.HostTest do
     assert :ok = Hemdal.Host.reload_all()
     assert [host_id, _] = Hemdal.Host.get_all()
 
-    echo = %Hemdal.Config.Alert.Command{
+    echo = %Hemdal.Config.Command{
       name: "hello world!",
       type: "line",
       command: ~s|echo '{"status": "OK", "message": "hello world!"}'|
     }
 
-    assert {:ok, {pid, ref}} = Hemdal.Host.exec_background(host_id, echo)
-    assert is_pid(pid)
-    assert is_reference(ref)
+    assert {:ok, worker} = Hemdal.Host.exec_background(host_id, echo)
+    assert is_pid(worker)
     assert_receive {:ok, %{"message" => "hello world!"}}, 5_000
   end
 
@@ -135,7 +134,7 @@ defmodule Hemdal.HostTest do
     assert :ok = Hemdal.Host.reload_all()
     assert [host_id, _] = Hemdal.Host.get_all()
 
-    echo = %Hemdal.Config.Alert.Command{
+    echo = %Hemdal.Config.Command{
       name: "hello world!",
       type: "script",
       command: """
@@ -155,7 +154,7 @@ defmodule Hemdal.HostTest do
     assert :ok = Hemdal.Host.reload_all()
     assert [host_id, _] = Hemdal.Host.get_all()
 
-    echo = %Hemdal.Config.Alert.Command{
+    echo = %Hemdal.Config.Command{
       name: "hello world!",
       type: "script",
       command: """
@@ -168,7 +167,7 @@ defmodule Hemdal.HostTest do
       """
     }
 
-    assert {:ok, {_pid, _ref}} = Hemdal.Host.exec_background(host_id, echo)
+    assert {:ok, _worker} = Hemdal.Host.exec_background(host_id, echo)
     assert_receive {:ok, %{"message" => "Hello World!"}}, 5_000
   end
 
@@ -176,9 +175,10 @@ defmodule Hemdal.HostTest do
     assert :ok = Hemdal.Host.reload_all()
     assert [host_id, _] = Hemdal.Host.get_all()
 
-    echo = %Hemdal.Config.Alert.Command{
+    echo = %Hemdal.Config.Command{
       name: "hello world!",
-      type: "interactive",
+      type: "line",
+      interactive: true,
       command: "cat"
     }
 
@@ -193,6 +193,48 @@ defmodule Hemdal.HostTest do
         assert_receive :closed
       end)
 
-    assert {:ok, %{"message" => "hello world!"}} = Hemdal.Host.exec(host_id, echo, [pid])
+    assert {:ok, %{"message" => "hello world!"}} = Hemdal.Host.exec(host_id, echo, caller: pid)
+  end
+
+  test "error running interactive shell command" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Command{
+      name: "hello world!",
+      type: "line",
+      interactive: true,
+      command: "cat"
+    }
+
+    assert {:error, %{"message" => "Impossible combination"}} = Hemdal.Host.exec(host_id, echo)
+  end
+
+  test "run interactive background shell command" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Command{
+      name: "hello world!",
+      type: "line",
+      interactive: true,
+      command: "cat"
+    }
+
+    assert {:ok, runner} = Hemdal.Host.exec_background(host_id, echo)
+    assert is_pid(runner)
+
+    assert_receive {:start, worker}
+    assert is_pid(worker)
+    refute runner != worker
+
+    send(worker, {:data, ~s|{"status": "OK",\n|})
+    assert_receive {:continue, ~s|{"status": "OK",\n|}
+    send(worker, {:data, ~s| "message": "hello world!"}\n|})
+    assert_receive {:continue, ~s| "message": "hello world!"}\n|}
+    send(worker, :close)
+    assert_receive :closed
+
+    assert_receive {:ok, %{"message" => "hello world!"}}, 5_000
   end
 end

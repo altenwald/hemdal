@@ -20,11 +20,10 @@ defmodule Hemdal.Config.Alert do
   - `command_args` is a list of arguments to be in use with the command.
   - `host` is the `Hemdal.Config.Host` data.
   - `command` is a nested structure including the command to be executed,
-    the name of the command, and the command type. See
-    `Hemdal.Config.Alert.Command`.
+    the name of the command, and the command type. See `Hemdal.Config.Command`.
   - `notifiers` is a list of `Hemdal.Config.Notifier`.
   """
-  alias Hemdal.Config.{Host, Notifier}
+  alias Hemdal.Config.{Command, Host, Notifier}
 
   use Construct do
     field(:id, :string)
@@ -37,26 +36,7 @@ defmodule Hemdal.Config.Alert do
     field(:command_args, {:array, :string}, default: [])
 
     field(:host, Host)
-
-    field :command do
-      @moduledoc """
-      The command structure is defining the command to be executed inside of
-      each alert. The data used is:
-
-      - `name` the name of the script.
-      - `type` the type of the script could be `line`, `script` or
-        `interactive`. The first one let us define a command in a single line,
-        the last one let us define a script, a multi-line code which will be
-        copied and executed in the host, and the last one let us run a command
-        interacting with a process for providing information in runtime.
-      - `command` as the command line to be executed. It could be only one line
-        or a multi-line script.
-      """
-      field(:name, :string)
-      field(:type, :string)
-      field(:command, :string)
-    end
-
+    field(:command, Command)
     field(:notifiers, {:array, Notifier}, default: [])
   end
 end

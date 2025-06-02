@@ -53,7 +53,7 @@ defmodule Hemdal.ConfigTest do
                module: Hemdal.Host.Local
              } = alert.host
 
-      assert %Hemdal.Config.Alert.Command{type: "line"} = alert.command
+      assert %Hemdal.Config.Command{type: "line"} = alert.command
 
       assert [%Hemdal.Config.Notifier{module: Hemdal.Notifier.Mock}] = alert.notifiers
 
@@ -77,7 +77,7 @@ defmodule Hemdal.ConfigTest do
       assert "2f1cc590-624b-4246-b1d4-2bc97416b321" == alert.id
       assert "single valid check" == alert.name
       assert %Hemdal.Config.Host{module: Hemdal.Host.Local} = alert.host
-      assert %Hemdal.Config.Alert.Command{type: "line"} = alert.command
+      assert %Hemdal.Config.Command{type: "line"} = alert.command
 
       assert [%Hemdal.Config.Notifier{module: Hemdal.Notifier.Mock}] = alert.notifiers
 

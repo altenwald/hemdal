@@ -15,7 +15,7 @@ defmodule Hemdal.Host do
   If you want to know more about what could be included in a command or
   to be run in a host you can review the following modules:
 
-  - `Hemdal.Config.Alert.Command` where you can check what's included
+  - `Hemdal.Config.Command` where you can check what's included
     inside of the command.
   - `Hemdal.Config.Host` where you can find information about the host.
 
@@ -54,7 +54,7 @@ defmodule Hemdal.Host do
   """
   use GenServer, restart: :transient
   require Logger
-  alias Hemdal.Config.Alert.Command
+  alias Hemdal.Config.Command
   alias :queue, as: Queue
 
   @default_temporal_dir "/tmp"
@@ -99,6 +99,26 @@ defmodule Hemdal.Host do
   @typedoc false
   @type host_id() :: String.t()
 
+  @typedoc """
+  The options for exec are providing to the execution valid information, and
+  sometimes required information about the running process.
+
+  For example, if we want to run an interactive command but using a
+  non-background execution, then we will need to provide `caller` option.
+
+  In addition, `args` are a list of arguments we pass to a script usually,
+  and `timeout` makes sense mainly for non-interactive executions. Indeed,
+  `timeout` is only applicable for the calling of the function, because
+  it returns usually fast (depending on the loaded queue), it's not very
+  useful for execution in background mode, and it could be dangerous in
+  interactive and non-background mode.
+  """
+  @type exec_opts() :: [
+          timeout: timeout(),
+          args: [String.t()],
+          caller: pid()
+        ]
+
   @doc """
   Run or execute the command passed as parameter. It's needed to pass the host ID
   to find the process where to send the request, and the the command and the
@@ -118,22 +138,24 @@ defmodule Hemdal.Host do
   If the JSON sent back from the command is valid, it's usually using that as
   data and it's marked as `UNKNOWN` status if there is no status defined.
   """
-  @spec exec(host_id(), Hemdal.Config.Alert.Command.t(), command_args()) ::
-          {:ok, map()} | {:error, map()}
-  @spec exec(host_id(), Hemdal.Config.Alert.Command.t(), command_args(), timeout()) ::
-          {:ok, map()} | {:error, map()}
-  def exec(host_id, cmd, args \\ [], timeout \\ @timeout_exec)
+  @spec exec(host_id(), Hemdal.Config.Command.t(), exec_opts()) :: {:ok, map()} | {:error, map()}
+  def exec(host_id, cmd, opts \\ [])
 
-  def exec(host_id, %Command{type: "line"} = cmd, _args, timeout) do
-    GenServer.call(via(host_id), {:exec, cmd, []}, timeout)
+  def exec(host_id, %Command{interactive: true} = cmd, opts) do
+    if caller = opts[:caller] do
+      timeout = opts[:timeout] || @timeout_exec
+      args = opts[:args] || []
+      GenServer.call(via(host_id), {:exec, caller, cmd, args}, timeout)
+    else
+      {:error, %{"message" => "Impossible combination"}}
+    end
   end
 
-  def exec(host_id, %Command{type: "script"} = cmd, args, timeout) do
-    GenServer.call(via(host_id), {:exec, cmd, args}, timeout)
-  end
-
-  def exec(host_id, %Command{type: "interactive"} = cmd, [pid], timeout) do
-    GenServer.call(via(host_id), {:exec, cmd, [pid]}, timeout)
+  def exec(host_id, %Command{} = cmd, opts) do
+    caller = opts[:caller] || self()
+    timeout = opts[:timeout] || @timeout_exec
+    args = opts[:args] || []
+    GenServer.call(via(host_id), {:exec, caller, cmd, args}, timeout)
   end
 
   @doc """
@@ -145,10 +167,13 @@ defmodule Hemdal.Host do
   which process is in charge of running the background process and to know if it's
   still running or not.
   """
-  @spec exec_background(host_id(), Hemdal.Config.Alert.Command.t(), command_args()) ::
+  @spec exec_background(host_id(), Hemdal.Config.Command.t(), exec_opts()) ::
           {:ok, pid()} | {:error, any()}
-  def exec_background(host_id, cmd, args \\ []) do
-    GenServer.call(via(host_id), {:exec_background, self(), cmd, args}, @timeout_exec)
+  def exec_background(host_id, cmd, opts \\ []) do
+    caller = opts[:caller] || self()
+    timeout = opts[:timeout] || @timeout_exec
+    args = opts[:args] || []
+    GenServer.call(via(host_id), {:exec_background, caller, cmd, args}, timeout)
   end
 
   @doc """
@@ -248,59 +273,58 @@ defmodule Hemdal.Host do
 
   @impl GenServer
   @doc false
-  def handle_call({:exec_background, pid, cmd, args}, _from, %__MODULE__{max_workers: :infinity} = state) do
+  def handle_call({:exec_background, caller, cmd, args}, _from, %__MODULE__{max_workers: :infinity} = state) do
     Logger.debug("host => workers: #{state.workers}/infinity ; queue length: #{Queue.len(state.queue)}")
 
-    send_result = &send(pid, &1)
-    ref = spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
-    {:reply, {:ok, ref}, %__MODULE__{state | workers: state.workers + 1}}
+    send_result = &send(caller, &1)
+    {worker, _ref} = spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
+    {:reply, {:ok, worker}, %__MODULE__{state | workers: state.workers + 1}}
   end
 
   def handle_call(
-        {:exec_background, pid, cmd, args},
+        {:exec_background, caller, cmd, args},
         from,
         %__MODULE__{max_workers: max_workers, workers: workers, queue: queue} = state
       )
       when workers >= max_workers do
     Logger.debug("host => workers: #{workers}/#{max_workers} ; queue length: #{Queue.len(queue) + 1}")
 
-    queue = Queue.in({{:exec_background, pid, cmd, args}, from}, queue)
+    queue = Queue.in({{:exec_background, caller, cmd, args}, from}, queue)
     {:noreply, %__MODULE__{state | queue: queue}}
   end
 
-  def handle_call({:exec_background, pid, cmd, args}, _from, state) do
-    send_result = &send(pid, &1)
-    ref = spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
+  def handle_call({:exec_background, caller, cmd, args}, _from, state) do
+    send_result = &send(caller, &1)
+    {worker, _ref} = spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
     workers = state.workers + 1
 
     Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue length: #{Queue.len(state.queue)}")
 
-    {:reply, {:ok, ref}, %__MODULE__{state | workers: workers}}
+    {:reply, {:ok, worker}, %__MODULE__{state | workers: workers}}
   end
 
-  def handle_call({:exec, cmd, args}, from, %__MODULE__{max_workers: :infinity} = state) do
+  def handle_call({:exec, caller, cmd, args}, from, %__MODULE__{max_workers: :infinity} = state) do
     Logger.debug("host => workers: #{state.workers}/infinity ; queue length: #{Queue.len(state.queue)}")
 
     send_result = &GenServer.reply(from, &1)
-    spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
+    spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
     {:noreply, %__MODULE__{state | workers: state.workers + 1}}
   end
 
   def handle_call(
-        {:exec, cmd, args},
+        {:exec, caller, cmd, args},
         from,
         %__MODULE__{max_workers: max_workers, workers: workers, queue: queue} = state
       )
       when workers >= max_workers do
     Logger.debug("host => workers: #{workers}/#{max_workers} ; queue length: #{Queue.len(queue) + 1}")
-
-    queue = Queue.in({{:exec, cmd, args}, from}, queue)
+    queue = Queue.in({{:exec, caller, cmd, args}, from}, queue)
     {:noreply, %__MODULE__{state | queue: queue}}
   end
 
-  def handle_call({:exec, cmd, args}, from, state) do
+  def handle_call({:exec, caller, cmd, args}, from, state) do
     send_result = &GenServer.reply(from, &1)
-    spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
+    spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
     workers = state.workers + 1
 
     Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue length: #{Queue.len(state.queue)}")
@@ -347,20 +371,17 @@ defmodule Hemdal.Host do
   @doc false
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     case Queue.out(state.queue) do
-      {:empty, _} ->
+      {:empty, queue} ->
         workers = state.workers - 1
         Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue length: 0")
-        {:noreply, %__MODULE__{state | workers: workers}}
+        {:noreply, %__MODULE__{state | workers: workers, queue: queue}}
 
-      {{:value, {{:exec, cmd, args}, from}}, queue} ->
+      {{:value, {{:exec, caller, cmd, args}, from}}, queue} ->
         state = %__MODULE__{state | queue: queue}
         send_result = &GenServer.reply(from, &1)
-        spawn_monitor(fn -> run_in_background(cmd, args, send_result, state) end)
-
-        Logger.debug(
-          "host => workers: #{state.workers}/#{state.max_workers} ; queue length: #{Queue.len(queue)}"
-        )
-
+        spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
+        qlen = Queue.len(queue)
+        Logger.debug("host => workers: #{state.workers}/#{state.max_workers} ; queue length: #{qlen}")
         {:noreply, state}
     end
   end
@@ -393,9 +414,9 @@ defmodule Hemdal.Host do
     {:error, %{"message" => other, "status" => "FAIL"}}
   end
 
-  defp run_in_background(cmd, args, send_result, %__MODULE__{host: %_{module: mod} = host}) do
+  defp run_in_background(caller, cmd, args, send_result, %__MODULE__{host: %_{module: mod} = host}) do
     mod.transaction(host, fn handler ->
-      with {:ok, errorlevel, output} <- exec_cmd(handler, mod, cmd, args),
+      with {:ok, errorlevel, output} <- exec_cmd(handler, mod, caller, cmd, args),
            {:ok, %{"status" => status} = data} <- decode(output) do
         Logger.debug("command exit(#{errorlevel}) output: #{inspect(data)}")
         run_result(data, errorlevel, status)
@@ -432,11 +453,15 @@ defmodule Hemdal.Host do
     |> String.pad_leading(7, "0")
   end
 
-  defp exec_cmd(handler, mod, %Command{type: "line", command: command}, _args) do
+  defp exec_cmd(handler, mod, _caller, %Command{type: "line", command: command, interactive: false}, _args) do
     mod.exec(handler, command)
   end
 
-  defp exec_cmd(handler, mod, %Command{type: "script", command: script}, args) do
+  defp exec_cmd(handler, mod, caller, %Command{type: "line", command: command}, _args) do
+    mod.exec_interactive(handler, command, caller)
+  end
+
+  defp exec_cmd(handler, mod, _caller, %Command{type: "script", command: script, interactive: false}, args) do
     tmp_file = Path.join([@default_temporal_dir, random_string()])
 
     try do
@@ -454,8 +479,18 @@ defmodule Hemdal.Host do
     end
   end
 
-  defp exec_cmd(handler, mod, %Command{type: "interactive", command: command}, [pid]) do
-    mod.exec_interactive(handler, command, pid)
+  defp exec_cmd(handler, mod, caller, %Command{type: "script", command: script}, args) do
+    tmp_file = Path.join([@default_temporal_dir, random_string()])
+
+    sh =
+      case String.split(script, ["\n"], trim: true) do
+        ["#!" <> shell | _] -> shell
+        _ -> @default_shell
+      end
+
+    mod.write_file(handler, tmp_file, script)
+    cmd = Enum.join([sh, tmp_file | args], " ")
+    mod.exec_interactive(handler, cmd, caller)
   end
 
   @typedoc """
