@@ -365,9 +365,7 @@ defmodule Hemdal.Check do
           metadata: error
         })
 
-        Logger.error(
-          "[#{alert.id}] confirmed fail [#{alert.name}] for [#{alert.host.name}] [#{t} sec]"
-        )
+        Logger.error("[#{alert.id}] confirmed fail [#{alert.name}] for [#{alert.host.name}] [#{t} sec]")
 
         timeout = alert.broken_recheck_in_sec * 1_000
         actions = [{:state_timeout, timeout, :check}]

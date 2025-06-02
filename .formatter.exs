@@ -1,3 +1,4 @@
 [
-  inputs: ["*.{ex,exs}", "{config,lib,test}/**/*.{ex,exs}"]
+  inputs: ["*.{ex,exs}", "{config,lib,test}/**/*.{ex,exs}"],
+  line_length: 110
 ]
