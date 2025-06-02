@@ -1,7 +1,7 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
-  @version "1.0.4"
+  @version "1.0.5"
 
   def project do
     [
