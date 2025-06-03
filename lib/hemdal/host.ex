@@ -417,7 +417,7 @@ defmodule Hemdal.Host do
   defp run_in_background(caller, cmd, args, send_result, %__MODULE__{host: %_{module: mod} = host}) do
     mod.transaction(host, fn handler ->
       with {:ok, errorlevel, output} <- exec_cmd(handler, mod, caller, cmd, args),
-           {:ok, %{"status" => status} = data} <- decode(output) do
+           {:ok, %{"status" => status} = data} <- decode(output, errorlevel, cmd.decode) do
         Logger.debug("command exit(#{errorlevel}) output: #{inspect(data)}")
         run_result(data, errorlevel, status)
       else
@@ -430,16 +430,38 @@ defmodule Hemdal.Host do
     :ok
   end
 
-  defp decode(output) do
+  defp decode(nil, 0, _), do: {:ok, %{"status" => "OK", "errorlevel" => 0}}
+
+  defp decode(nil, errorlevel, _) do
+    {:error, %{"status" => "UNKNOWN", "errorlevel" => errorlevel}}
+  end
+
+  defp decode(output, 0, false) when is_binary(output) do
+    {:ok, %{"status" => "OK", "message" => output}}
+  end
+
+  defp decode(output, 0, false) do
+    {:ok, %{"status" => "OK", "message" => "#{inspect(output)}"}}
+  end
+
+  defp decode(output, errorlevel, false) when is_binary(output) do
+    {:ok, %{"status" => "OK", "message" => output, "errorlevel" => errorlevel}}
+  end
+
+  defp decode(output, errorlevel, false) do
+    {:ok, %{"status" => "OK", "message" => "#{inspect(output)}", "errorlevel" => errorlevel}}
+  end
+
+  defp decode(output, errorlevel, true) do
     case Jason.decode(output) do
       {:ok, [status, message]} ->
-        {:ok, %{"status" => status, "message" => message}}
+        {:ok, %{"status" => status, "message" => message, "errorlevel" => errorlevel}}
 
       {:ok, status} when is_binary(status) ->
-        {:ok, %{"status" => status}}
+        {:ok, %{"status" => status, "errorlevel" => errorlevel}}
 
       {:error, %Jason.DecodeError{data: error}} ->
-        {:error, %{"message" => error, "status" => "UNKNOWN"}}
+        {:error, %{"message" => error, "status" => "UNKNOWN", "errorlevel" => errorlevel}}
 
       other_resp ->
         other_resp
@@ -453,12 +475,18 @@ defmodule Hemdal.Host do
     |> String.pad_leading(7, "0")
   end
 
+  defp exec_cmd(handler, mod, caller, %Command{type: "shell"} = cmd, _args) do
+    opts = [output: cmd.output, timeout: cmd.idle_timeout, command: cmd.command]
+    mod.shell(handler, caller, opts)
+  end
+
   defp exec_cmd(handler, mod, _caller, %Command{type: "line", command: command, interactive: false}, _args) do
     mod.exec(handler, command)
   end
 
-  defp exec_cmd(handler, mod, caller, %Command{type: "line", command: command}, _args) do
-    mod.exec_interactive(handler, command, caller)
+  defp exec_cmd(handler, mod, caller, %Command{type: "line", command: command} = cmd, _args) do
+    opts = [output: cmd.output, timeout: cmd.idle_timeout]
+    mod.exec_interactive(handler, command, caller, opts)
   end
 
   defp exec_cmd(handler, mod, _caller, %Command{type: "script", command: script, interactive: false}, args) do
@@ -479,7 +507,7 @@ defmodule Hemdal.Host do
     end
   end
 
-  defp exec_cmd(handler, mod, caller, %Command{type: "script", command: script}, args) do
+  defp exec_cmd(handler, mod, caller, %Command{type: "script", command: script} = command, args) do
     tmp_file = Path.join([@default_temporal_dir, random_string()])
 
     sh =
@@ -490,7 +518,8 @@ defmodule Hemdal.Host do
 
     mod.write_file(handler, tmp_file, script)
     cmd = Enum.join([sh, tmp_file | args], " ")
-    mod.exec_interactive(handler, cmd, caller)
+    opts = [output: command.output, timeout: command.idle_timeout]
+    mod.exec_interactive(handler, cmd, caller, opts)
   end
 
   @typedoc """
@@ -552,13 +581,31 @@ defmodule Hemdal.Host do
   """
   @callback exec(handler(), command()) :: {:ok, errorlevel(), output()} | {:error, reason()}
 
+  @typedoc """
+  The options for `exec_interactive/4` and `shell/2` let us define if we want to
+  accumulate the output (it's usually not desirable for shell sessions) and the
+  timeout for idle. It means the time it wait between interactions to close the
+  communication.
+  """
+  @type exec_mod_opts() :: [
+          output: boolean(),
+          timeout: timeout()
+        ]
+
   @doc """
   Exec an interactive command implemented by the module where it's
   implemented. The `c:exec_interactive/3` command is getting a handler from the
   transaction and the command to be executed as a string.
   """
-  @callback exec_interactive(handler(), command(), pid()) ::
-              {:ok, errorlevel(), output()} | {:error, reason()}
+  @callback exec_interactive(handler(), command(), pid(), exec_mod_opts()) ::
+              {:ok, pid()} | {:ok, errorlevel(), output()} | {:error, reason()}
+
+  @doc """
+  Start a shell and connect to it. The shell usually has specific features that let
+  us to do more than in normal or usual exec commands.
+  """
+  @callback shell(handler(), pid(), exec_mod_opts()) ::
+              {:ok, pid()} | {:ok, errorlevel(), output()} | {:error, reason()}
 
   @doc """
   Write a file in the remote (or local) host. It's intended to write the

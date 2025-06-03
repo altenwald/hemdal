@@ -237,4 +237,37 @@ defmodule Hemdal.HostTest do
 
     assert_receive {:ok, %{"message" => "hello world!"}}, 5_000
   end
+
+  test "run shell" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    echo = %Hemdal.Config.Command{
+      name: "hello world!",
+      type: "shell",
+      interactive: true,
+      command: "cat"
+    }
+
+    assert {:ok, runner} = Hemdal.Host.exec_background(host_id, echo)
+    assert is_pid(runner)
+
+    assert_receive {:start, worker}
+    assert is_pid(worker)
+    refute runner != worker
+
+    send(worker, {:data, ~s|{"status": "OK",\n|})
+    assert_receive {:continue, ~s|{"status": "OK",\n|}
+    send(worker, {:data, ~s| "message": "hello world!"}\n|})
+    assert_receive {:continue, ~s| "message": "hello world!"}\n|}
+    send(worker, {:data, <<4>>})
+    assert_receive {:continue, "\x04"}
+    assert_receive {:continue, ~s|{"status": "OK",\n "message": "hello world!"}\n\x04|}
+    send(worker, :close)
+    assert_receive :closed
+
+    message = ~s|{"status": "OK",\n "message": "hello world!"}\n\x04|
+    received_message = message <> message
+    assert_receive {:error, %{"message" => ^received_message}}, 5_000
+  end
 end

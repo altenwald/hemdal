@@ -8,6 +8,8 @@ defmodule Hemdal.Host.Local do
   """
   use Hemdal.Host
 
+  @default_idle_timeout :timer.minutes(1)
+
   @impl Hemdal.Host
   @doc """
   Run locally a command. It's using `System.shell/2` for achieving that.
@@ -18,33 +20,51 @@ defmodule Hemdal.Host.Local do
   end
 
   @impl Hemdal.Host
-  def exec_interactive(_opts, command, caller) when is_pid(caller) do
+  def exec_interactive(_opts, command, caller, opts) when is_pid(caller) do
     port = Port.open({:spawn, command}, [:binary])
     send(caller, {:start, self()})
-    get_and_send_all(port, caller, "")
+    output = if(opts[:output], do: "")
+    opts = [{:echo, false} | opts]
+    get_and_send_all(port, caller, output, opts)
   end
 
-  defp get_and_send_all(port, pid, output) do
+  @impl Hemdal.Host
+  def shell(_opts, caller, opts) when is_pid(caller) do
+    port = Port.open({:spawn, opts[:command]}, [:binary])
+    send(caller, {:start, self()})
+    output = if(opts[:output], do: "")
+    opts = [{:echo, true} | opts]
+    get_and_send_all(port, caller, output, opts)
+  end
+
+  defp get_and_send_all(port, caller, output, opts) do
     receive do
       {:data, data} ->
         send(port, {self(), {:command, data}})
-        get_and_send_all(port, pid, output)
+
+        if opts[:echo] do
+          send(caller, {:continue, data})
+          get_and_send_all(port, caller, output <> data, opts)
+        else
+          get_and_send_all(port, caller, output, opts)
+        end
+
+      {^port, {:data, data}} ->
+        send(caller, {:continue, data})
+        output = if(output, do: output <> data)
+        get_and_send_all(port, caller, output, opts)
 
       :close ->
         send(port, {self(), :close})
-        get_and_send_all(port, pid, output)
-
-      {^port, {:data, data}} ->
-        send(pid, {:continue, data})
-        get_and_send_all(port, pid, output <> data)
+        get_and_send_all(port, caller, output, opts)
 
       {^port, :closed} ->
-        send(pid, :closed)
+        send(caller, :closed)
         {:ok, 0, output}
     after
-      60_000 ->
+      opts[:timeout] || @default_idle_timeout ->
         Port.close(port)
-        send(pid, :closed)
+        send(caller, :closed)
         {:ok, 127, output}
     end
   end
