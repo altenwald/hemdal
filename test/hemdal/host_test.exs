@@ -102,6 +102,54 @@ defmodule Hemdal.HostTest do
     ] == Hemdal.Host.get_all()
   end
 
+  test "queue empty" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    long_run = %Hemdal.Config.Command{
+      name: "wait",
+      type: "line",
+      command: "sleep 1 && printf DONE",
+      output: false,
+      decode: false
+    }
+
+    stats = Hemdal.Host.get_stats(host_id)
+    assert 1 == stats.max_running_workers
+    assert 0 == stats.running_workers
+    assert 0 == stats.waiting_workers
+
+    assert {:ok, _worker} = Hemdal.Host.exec_background(host_id, long_run)
+
+    stats = Hemdal.Host.get_stats(host_id)
+    assert 1 == stats.running_workers
+    assert 0 == stats.waiting_workers
+
+    spawn_monitor(fn ->
+      assert {:ok, _worker} = Hemdal.Host.exec_background(host_id, long_run)
+      assert_receive {:ok, %{"message" => "DONE"}}, 2_000
+    end)
+
+    Process.sleep(100)
+    stats = Hemdal.Host.get_stats(host_id)
+    assert 1 == stats.running_workers
+    assert 1 == stats.waiting_workers
+
+    spawn_monitor(fn ->
+      assert {:ok, _worker} = Hemdal.Host.exec_background(host_id, long_run)
+      assert_receive {:ok, %{"message" => "DONE"}}, 2_000
+    end)
+
+    Process.sleep(100)
+    stats = Hemdal.Host.get_stats(host_id)
+    assert 1 == stats.running_workers
+    assert 2 == stats.waiting_workers
+
+    assert_receive {:ok, %{"message" => "DONE"}}, 2_000
+    assert_receive {:DOWN, _ref, :process, _pid, _reason}, 2_000
+    assert_receive {:DOWN, _ref, :process, _pid, _reason}, 2_000
+  end
+
   test "run shell command" do
     assert :ok = Hemdal.Host.reload_all()
     assert [host_id, _] = Hemdal.Host.get_all()
@@ -119,15 +167,37 @@ defmodule Hemdal.HostTest do
     assert :ok = Hemdal.Host.reload_all()
     assert [host_id, _] = Hemdal.Host.get_all()
 
+    assert %{
+             "78eb75f9-2ac7-434c-a1a2-330b23c89982" => %{
+               status: :up,
+               max_running_workers: 1,
+               running_workers: 0,
+               waiting_workers: 0
+             },
+             "f8441510-95db-4e00-a3e0-1556bb8a778c" => %{
+               status: :up,
+               max_running_workers: 1,
+               running_workers: 0,
+               waiting_workers: 0
+             }
+           } == Hemdal.Host.get_all_stats()
+
     echo = %Hemdal.Config.Command{
       name: "hello world!",
       type: "line",
-      command: ~s|echo '{"status": "OK", "message": "hello world!"}'|
+      command: ~s|sleep 1 && echo '{"status": "OK", "message": "hello world!"}'|
     }
 
     assert {:ok, worker} = Hemdal.Host.exec_background(host_id, echo)
     assert is_pid(worker)
+
+    assert %{status: :up, waiting_workers: 0, running_workers: 1, max_running_workers: 1} ==
+             Hemdal.Host.get_stats(host_id)
+
     assert_receive {:ok, %{"message" => "hello world!"}}, 5_000
+
+    assert %{status: :up, waiting_workers: 0, running_workers: 0, max_running_workers: 1} ==
+             Hemdal.Host.get_stats(host_id)
   end
 
   test "run script" do

@@ -245,13 +245,51 @@ defmodule Hemdal.Host do
   @spec update_host(Hemdal.Config.Host.t()) :: {:ok, pid()}
   def update_host(host) do
     if pid = get_pid(host.id) do
-      GenStateMachine.cast(pid, {:update, host})
+      GenServer.cast(pid, {:update, host})
       {:ok, pid}
     else
       start(host)
     end
   end
 
+  @typedoc """
+  Information about the status of the host. The host is limiting the number
+  of running workers so we can get the information of the following data:
+
+  - `waiting_workers` the current number of requests awaiting in the queue.
+  - `running_workers` the number of running workers.
+  - `max_running_workers` the max number of workers that could be run at
+    the same time.
+  """
+  @type host_stats() :: %{
+          :status => :up | :down,
+          optional(:waiting_workers) => non_neg_integer(),
+          optional(:running_workers) => non_neg_integer(),
+          optional(:max_running_workers) => non_neg_integer()
+        }
+
+  @doc """
+  Retrieve stats for a specific host.
+  """
+  @spec get_stats(host_id()) :: host_stats()
+  def get_stats(host_id) do
+    GenServer.call(via(host_id), :get_stats)
+  catch
+    :exit, {:noproc, _info} ->
+      %{status: :down}
+  end
+
+  @doc """
+  Retrieve stats for all of the hosts. See `get_stats/1`.
+  """
+  @spec get_all_stats :: %{host_id() => host_stats()}
+  def get_all_stats do
+    @registry_name
+    |> Registry.select([{{:"$1", :_, :_}, [], [:"$1"]}])
+    |> Map.new(&{&1, get_stats(&1)})
+  end
+
+  @typedoc false
   @type t() :: %__MODULE__{
           host: nil | Hemdal.Config.Host.t(),
           max_workers: :infinity | non_neg_integer(),
@@ -332,6 +370,17 @@ defmodule Hemdal.Host do
     {:noreply, %__MODULE__{state | workers: workers}}
   end
 
+  def handle_call(:get_stats, _from, %__MODULE__{} = state) do
+    stats = %{
+      status: :up,
+      waiting_workers: Queue.len(state.queue),
+      running_workers: state.workers,
+      max_running_workers: state.max_workers
+    }
+
+    {:reply, stats, state}
+  end
+
   @impl GenServer
   @doc false
   def handle_cast({:update, host}, state) do
@@ -363,26 +412,38 @@ defmodule Hemdal.Host do
 
   defp launch_extra(state, false) do
     {{:value, {info, from}}, queue} = Queue.out(state.queue)
-    {:noreply, state} = handle_call(info, from, %__MODULE__{state | queue: queue})
-    launch_extra(state, Queue.is_empty(state.queue))
+
+    case handle_call(info, from, %__MODULE__{state | queue: queue}) do
+      {:noreply, state} ->
+        launch_extra(state, Queue.is_empty(state.queue))
+
+      {:reply, reply, state} ->
+        GenServer.reply(from, reply)
+        launch_extra(state, Queue.is_empty(state.queue))
+    end
   end
 
   @impl GenServer
   @doc false
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
-    case Queue.out(state.queue) do
-      {:empty, queue} ->
-        workers = state.workers - 1
-        Logger.debug("host => workers: #{workers}/#{state.max_workers} ; queue length: 0")
-        {:noreply, %__MODULE__{state | workers: workers, queue: queue}}
+    {next, queue} = Queue.out(state.queue)
+    state = %__MODULE__{state | queue: queue, workers: state.workers - 1}
+    len = Queue.len(queue)
+    Logger.debug("host => workers: #{state.workers}/#{state.max_workers} ; queue length: #{len}")
 
-      {{:value, {{:exec, caller, cmd, args}, from}}, queue} ->
-        state = %__MODULE__{state | queue: queue}
-        send_result = &GenServer.reply(from, &1)
-        spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
-        qlen = Queue.len(queue)
-        Logger.debug("host => workers: #{state.workers}/#{state.max_workers} ; queue length: #{qlen}")
+    case next do
+      :empty ->
         {:noreply, state}
+
+      {:value, {info, from}} ->
+        case handle_call(info, from, state) do
+          {:noreply, state} ->
+            {:noreply, state}
+
+          {:reply, reply, state} ->
+            GenServer.reply(from, reply)
+            {:noreply, state}
+        end
     end
   end
 
