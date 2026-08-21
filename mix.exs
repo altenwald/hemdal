@@ -58,7 +58,7 @@ defmodule Hemdal.MixProject do
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:doctor, ">= 0.0.0", only: [:dev, :test], runtime: false},
-      {:ex_check, "~> 0.14", only: [:dev, :test], runtime: false},
+      {:ex_check, "~> 0.16", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
@@ -86,7 +86,8 @@ defmodule Hemdal.MixProject do
           Hemdal.Config.Host,
           Hemdal.Config.Notifier,
           Hemdal.Config.Module,
-          Hemdal.Config.Options
+          Hemdal.Config.Options,
+          Hemdal.Config.MaxWorkers
         ],
         "Configuration Backend": [
           Hemdal.Config.Backend,
@@ -130,9 +131,9 @@ defmodule Hemdal.MixProject do
 
   defp package do
     [
-      files: ~w[ lib guides mix.* *.md COPYING ],
+      files: ~w[ lib guides mix.* *.md LICENSE* ],
       maintainers: ["Manuel Rubio"],
-      licenses: ["LGPL-2.1-only"],
+      licenses: ["MIT"],
       links: %{
         "GitHub" => "https://github.com/altenwald/hemdal",
         "Docs" => "https://hexdocs.pm/hemdal"

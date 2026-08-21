@@ -1,42 +1,116 @@
 # Hemdal Alerts/Alarms Panel
 
 [![Elixir CI](https://github.com/altenwald/hemdal/actions/workflows/elixir.yml/badge.svg)](https://github.com/altenwald/hemdal/actions/workflows/elixir.yml)
-[![License: LGPL 2.1](https://img.shields.io/github/license/altenwald/hemdal.svg)](https://raw.githubusercontent.com/altenwald/hemdal/master/COPYING)
+[![Hex.pm Version](https://img.shields.io/hexpm/v/hemdal.svg)](https://hex.pm/packages/hemdal)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/hemdal/)
+[![Hex.pm Total Downloads](https://img.shields.io/hexpm/dt/hemdal.svg)](https://hex.pm/packages/hemdal)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://raw.githubusercontent.com/altenwald/hemdal/master/LICENSE)
+[![Last Updated](https://img.shields.io/github/last-commit/altenwald/hemdal.svg)](https://github.com/altenwald/hemdal/commits/master)
 [![Paypal: Donation](https://img.shields.io/badge/paypal-donation-yellow)](https://www.paypal.com/donate/?hosted_button_id=XK6Z5XATN77L2)
 [![Patreon: Donation](https://img.shields.io/badge/patreon-donation-yellow)](https://www.patreon.com/altenwald)
 
-Alerts/Alarms library to get notified when an error or recovery happens.
+**Hemdal** is an extensible alerts and alarms monitoring library for Elixir applications. It proactively monitors local and remote hosts, evaluates health check rules, tracks state transitions, and sends notifications when issues or recoveries occur.
 
-Features:
+---
 
-- Extensible architecture, it let us add:
-  - Hemdal.Host providing a way to run commands, at the moment [Trooper](https://github.com/army-cat/trooper) and Local.
-  - Hemdal.Event is using [GenStage](https://hex.pm/packages/gen_stage), we can consume events.
-  - Hemdal.Notifier is sending events outside, it's using at the moment Slack and Mattermost.
-  - Hemdal.Config.Backend is letting us read the configuration from different places: Env and Json.
-- Connecting proactively to the servers (no agents needed):
-  - SSH user and password configuration.
-  - SSH user and certificate (RSA, DSA and ECDSA).
-  - SFTP to send scripts commands to run.
-- Enable/Disable alerts.
-- Reload configuration.
+## Features
+
+- **Extensible Host Execution (`Hemdal.Host`):**
+  - Execute checks locally ([`Hemdal.Host.Local`](https://hexdocs.pm/hemdal/Hemdal.Host.Local.html)) or remotely via SSH/PTY/SFTP with [Trooper](https://github.com/army-cat/trooper).
+  - Proactive connections without requiring agent installations on target servers.
+  - Worker pooling with dynamic concurrency limits (`max_workers`) and queue draining.
+- **Robust State Machine (`Hemdal.Check`):**
+  - Manages check lifecycles with configurable check intervals, recheck intervals, and retry thresholds.
+  - States: `:normal` (OK), `:failing` (WARN), `:broken` (FAIL), and `:disabled` (OFF).
+- **Event Pipeline (`Hemdal.Event`):**
+  - Built with [GenStage](https://hex.pm/packages/gen_stage) for reliable event production and consumption.
+  - Logging consumer ([`Hemdal.Event.Log`](https://hexdocs.pm/hemdal/Hemdal.Event.Log.html)) and notification dispatcher ([`Hemdal.Event.Notification`](https://hexdocs.pm/hemdal/Hemdal.Event.Notification.html)).
+- **Integrated Notifiers (`Hemdal.Notifier`):**
+  - Ready-to-use integrations for [Slack](https://hexdocs.pm/hemdal/Hemdal.Notifier.Slack.html) and [Mattermost](https://hexdocs.pm/hemdal/Hemdal.Notifier.Mattermost.html).
+  - Easy-to-implement behaviour for custom notification channels (Email, Webhooks, Telegram, PagerDuty, etc.).
+- **Flexible Configuration Backends (`Hemdal.Config`):**
+  - Read configuration from Elixir Application Environment (`Env`) or JSON files (`Json`).
+  - Supports dynamic configuration reloads at runtime via `Hemdal.reload_all/0`.
+
+---
+
+## Installation
+
+Add `hemdal` to your list of dependencies in `mix.exs`:
+
+```elixir
+def deps do
+  [
+    {:hemdal, "~> 1.2"}
+  ]
+end
+```
+
+---
+
+## Quick Example
+
+Configure your hosts and alert checks in `config/config.exs`:
+
+```elixir
+import Config
+
+config :hemdal, :config_module, Hemdal.Config.Backend.Env
+
+config :hemdal, Hemdal.Config, [
+  [
+    id: "disk-space-check",
+    name: "Disk Space Check",
+    host: [
+      id: "localhost-node",
+      name: "localhost",
+      module: Hemdal.Host.Local,
+      max_workers: 2
+    ],
+    command: [
+      name: "check_disk",
+      type: "line",
+      command: "df -h / | awk 'NR==2 {print $5}'"
+    ],
+    check_in_sec: 60,
+    recheck_in_sec: 10,
+    retries: 3,
+    notifiers: [
+      [
+        module: Hemdal.Notifier.Slack,
+        token: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        channel: "#monitoring",
+        username: "HemdalBot"
+      ]
+    ]
+  ]
+]
+```
+
+---
 
 ## Documentation
 
-Documentation is available through [hexdocs here](https://hexdocs.pm/hemdal).
+Full documentation and guides are available on [HexDocs](https://hexdocs.pm/hemdal):
 
-## Why LGPL?!?
+- [Getting Started](https://hexdocs.pm/hemdal/getting_started.html)
+- [Creating Alerts](https://hexdocs.pm/hemdal/creating_alerts.html)
+- [Notifying to Slack](https://hexdocs.pm/hemdal/notifying_to_slack.html)
 
-Despite of a lot of people think, LGPL it's not too restrictive. It's like many others around (MIT, BSD, Apache, ...) but makes an extra-effort to keep this code (and only this code, not yours) always free (free as freedom and not like a free beer).
+---
 
-Said that, if you want to include this code with your code (propietary or with other licences), you can! there is no problem! The only restriction is: **when you make modifications in THIS code, you should to share them** and all of the community will be grateful if you open a pull request to get feedback to the original project ;-).
+## License
 
-## What's next?
+This project is licensed under the terms of the [MIT License](LICENSE).
 
-Check the [documentation](https://hexdocs.pm/hemdal) first and, if you find something wrong, broken or you want to make a suggestion or ask something, you can open an issue via Github issues. Also you can provide PR (pull requests) with fixes if you catch some of them, or provide some features. Keep in mind our [Code of Conduct](CODE_OF_CONDUCT.md). You can also check [our documentation about how to contributing to get further information](CONTRIBUTING.md).
+---
 
-Don't forget to support us if you find this project interesting enough:
+## Contributing & Support
 
-[![paypal](https://www.paypalobjects.com/en_US/GB/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=XK6Z5XATN77L2)
+- Open an issue or pull request on [GitHub](https://github.com/altenwald/hemdal).
+- Please adhere to our [Code of Conduct](CODE_OF_CONDUCT.md) and review our [Contributing Guidelines](CONTRIBUTING.md).
+- If you find Hemdal helpful, consider supporting the project:
+
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/GB/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=XK6Z5XATN77L2)
 
 Enjoy!
