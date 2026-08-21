@@ -72,10 +72,9 @@ defmodule Hemdal.Host do
   @doc """
   Start a new host under the `Hemdal.Host.Supervisor` module.
   """
-  @spec start(Hemdal.Config.Host.t()) :: :ok
+  @spec start(Hemdal.Config.Host.t()) :: {:ok, pid()} | {:error, any()}
   def start(host) do
-    {:ok, _} = DynamicSupervisor.start_child(@sup_name, {__MODULE__, [host]})
-    :ok
+    DynamicSupervisor.start_child(@sup_name, {__MODULE__, [host]})
   end
 
   @doc """
@@ -113,11 +112,13 @@ defmodule Hemdal.Host do
   useful for execution in background mode, and it could be dangerous in
   interactive and non-background mode.
   """
-  @type exec_opts() :: [
-          timeout: timeout(),
-          args: [String.t()],
-          caller: pid()
-        ]
+  @type exec_opts() ::
+          [
+            timeout: timeout(),
+            args: [String.t()],
+            caller: pid()
+          ]
+          | [String.t()]
 
   @doc """
   Run or execute the command passed as parameter. It's needed to pass the host ID
@@ -140,6 +141,10 @@ defmodule Hemdal.Host do
   """
   @spec exec(host_id(), Hemdal.Config.Command.t(), exec_opts()) :: {:ok, map()} | {:error, map()}
   def exec(host_id, cmd, opts \\ [])
+
+  def exec(host_id, %Command{} = cmd, args) when is_list(args) and args != [] and not is_tuple(hd(args)) do
+    exec(host_id, cmd, args: args)
+  end
 
   def exec(host_id, %Command{interactive: true} = cmd, opts) do
     if caller = opts[:caller] do
@@ -169,7 +174,14 @@ defmodule Hemdal.Host do
   """
   @spec exec_background(host_id(), Hemdal.Config.Command.t(), exec_opts()) ::
           {:ok, pid()} | {:error, any()}
-  def exec_background(host_id, cmd, opts \\ []) do
+  def exec_background(host_id, cmd, opts \\ [])
+
+  def exec_background(host_id, %Command{} = cmd, args)
+      when is_list(args) and args != [] and not is_tuple(hd(args)) do
+    exec_background(host_id, cmd, args: args)
+  end
+
+  def exec_background(host_id, cmd, opts) do
     caller = opts[:caller] || self()
     timeout = opts[:timeout] || @timeout_exec
     args = opts[:args] || []
@@ -242,7 +254,7 @@ defmodule Hemdal.Host do
   nutshell, it's: if exist host ID then perform an update of the host
   information, else start the process with the host information.
   """
-  @spec update_host(Hemdal.Config.Host.t()) :: {:ok, pid()}
+  @spec update_host(Hemdal.Config.Host.t()) :: {:ok, pid()} | {:error, any()}
   def update_host(host) do
     if pid = get_pid(host.id) do
       GenServer.cast(pid, {:update, host})
@@ -384,12 +396,24 @@ defmodule Hemdal.Host do
   @impl GenServer
   @doc false
   def handle_cast({:update, host}, state) do
-    case {host.max_workers, state.host.max_workers} do
-      {max_workers, max_workers} ->
+    old_max = state.max_workers
+    new_max = host.max_workers
+
+    case {new_max, old_max} do
+      {max, max} ->
         {:noreply, %__MODULE__{state | host: host}}
 
       {:infinity, _} ->
-        {:noreply, %__MODULE__{state | host: host, max_workers: :infinity}}
+        state =
+          launch_extra(
+            %__MODULE__{state | host: host, max_workers: :infinity},
+            Queue.is_empty(state.queue)
+          )
+
+        {:noreply, state}
+
+      {new_max_workers, :infinity} ->
+        {:noreply, %__MODULE__{state | host: host, max_workers: new_max_workers}}
 
       {new_max_workers, old_max_workers} when new_max_workers < old_max_workers ->
         {:noreply, %__MODULE__{state | host: host, max_workers: new_max_workers}}
@@ -476,15 +500,21 @@ defmodule Hemdal.Host do
   end
 
   defp run_in_background(caller, cmd, args, send_result, %__MODULE__{host: %_{module: mod} = host}) do
-    mod.transaction(host, fn handler ->
-      with {:ok, errorlevel, output} <- exec_cmd(handler, mod, caller, cmd, args),
-           {:ok, %{"status" => status} = data} <- decode(output, errorlevel, cmd.decode) do
-        Logger.debug("command exit(#{errorlevel}) output: #{inspect(data)}")
-        run_result(data, errorlevel, status)
-      else
-        other -> other
-      end
-    end)
+    try do
+      mod.transaction(host, fn handler ->
+        with {:ok, errorlevel, output} <- exec_cmd(handler, mod, caller, cmd, args),
+             {:ok, %{"status" => status} = data} <- decode(output, errorlevel, cmd.decode) do
+          Logger.debug("command exit(#{errorlevel}) output: #{inspect(data)}")
+          run_result(data, errorlevel, status)
+        else
+          other -> other
+        end
+      end)
+    rescue
+      error -> {:error, %{"status" => "FAIL", "message" => Exception.message(error)}}
+    catch
+      kind, reason -> {:error, %{"status" => "FAIL", "message" => inspect({kind, reason})}}
+    end
     |> final_run_result()
     |> send_result.()
 

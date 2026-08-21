@@ -36,6 +36,7 @@ defmodule Hemdal.Config.Backend.Env do
   See `Hemdal.Config.Alert` and `Hemdal.Config.Host` for further information.
   """
   use Hemdal.Config
+  alias Hemdal.Config.{Alert, Host}
 
   defp get_config do
     Application.fetch_env!(:hemdal, Hemdal.Config)
@@ -46,12 +47,13 @@ defmodule Hemdal.Config.Backend.Env do
   configuration.
   """
   @impl Hemdal.Config
-  @spec get_all_hosts() :: [Hemdal.Config.Host.t()]
+  @spec get_all_hosts() :: [Host.t()]
   def get_all_hosts do
     get_config()
     |> Enum.map(& &1[:host])
-    |> Enum.uniq()
-    |> Enum.map(&Hemdal.Config.Host.make!/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&Host.make!/1)
+    |> Enum.uniq_by(& &1.id)
   end
 
   @doc """
@@ -59,9 +61,9 @@ defmodule Hemdal.Config.Backend.Env do
   configuration.
   """
   @impl Hemdal.Config
-  @spec get_all_alerts() :: [Hemdal.Config.Alert.t()]
+  @spec get_all_alerts() :: [Alert.t()]
   def get_all_alerts do
     get_config()
-    |> Enum.map(&Hemdal.Config.Alert.make!/1)
+    |> Enum.map(&Alert.make!/1)
   end
 end

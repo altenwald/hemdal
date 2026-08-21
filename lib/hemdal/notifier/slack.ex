@@ -21,8 +21,12 @@ defmodule Hemdal.Notifier.Slack do
     Logger.debug("sending to #{uri}: #{inspect(slack_msg)}")
 
     case post(uri, slack_msg) do
-      {:ok, _resp} ->
+      {:ok, %{status: status}} when status in 200..299 ->
         :ok
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("cannot send message for Slack: status #{status}, body: #{inspect(body)}")
+        {:error, %{status: status, body: body}}
 
       {:error, reason} = error ->
         Logger.error("cannot send message for Slack: #{inspect(reason)}")

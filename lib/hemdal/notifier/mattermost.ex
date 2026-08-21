@@ -23,17 +23,30 @@ defmodule Hemdal.Notifier.Mattermost do
       "props" => %{"attachments" => msg["attachments"]}
     }
 
+    base_url =
+      case metadata do
+        %{"base_url" => url} -> url
+        %{base_url: url} -> url
+        _ -> "http://localhost"
+      end
+      |> String.trim_trailing("/")
+
+    url = "#{base_url}/posts"
+
+    Logger.debug("sending to #{inspect(url)} (#{token}): #{inspect(msg)}")
+
     headers = [
       {"authorization", "bearer #{token}"}
     ]
 
-    metadata["base_url"]
-    |> Path.join("/posts")
-    |> tap(&Logger.debug("sending to #{inspect(&1)} (#{token}): #{inspect(msg)}"))
-    |> post(msg, headers: headers)
+    post(url, msg, headers: headers)
     |> case do
-      {:ok, _resp} ->
+      {:ok, %{status: status}} when status in 200..299 ->
         :ok
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("sending: status #{status}, body: #{inspect(body)}")
+        {:error, %{status: status, body: body}}
 
       {:error, reason} = error ->
         Logger.error("sending: #{inspect(reason)}")

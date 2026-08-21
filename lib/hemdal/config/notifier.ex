@@ -8,8 +8,8 @@ defmodule Hemdal.Config.Notifier do
   - `token` is the information needed to send a message for some
     platforms like Slack or Mattermost. But it could means even a
     password for an email backend.
-  - `type` the name used to be concatenated to `Hemdal.Notifier` and
-    find for the module.
+  - `module` specifies the notifier module to use, e.g. `Hemdal.Notifier.Slack`
+    or `Hemdal.Notifier.Mattermost` (default: `Hemdal.Notifier.Slack`).
   - `username` is the name of the user to show the notification. But
     it could means different things depending on the backend. For an
     email backend it could be the user/email to send the message.

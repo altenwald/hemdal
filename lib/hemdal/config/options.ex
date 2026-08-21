@@ -11,6 +11,8 @@ defmodule Hemdal.Config.Options do
 
   @spec cast(term) :: {:ok, t()} | {:error, term} | :error
   @doc false
+  def cast([]), do: {:ok, []}
   def cast([{_key, _value} | _] = keyword), do: {:ok, keyword}
   def cast(%{} = map), do: {:ok, map}
+  def cast(_), do: :error
 end

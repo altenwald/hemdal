@@ -67,11 +67,11 @@ defmodule Hemdal.Notifier do
   end
 
   defp get_msg(alert, _duration, :ok, :ok) do
-    "sucessful run #{alert.name} on #{alert.host.name}"
+    "successful run #{alert.name} on #{alert.host.name}"
   end
 
   defp get_msg(alert, duration, :ok, :warn) do
-    "sucessful again run #{alert.name} on #{alert.host.name} after #{duration} sec"
+    "successful again run #{alert.name} on #{alert.host.name} after #{duration} sec"
   end
 
   defp get_msg(alert, duration, :ok, :error) do
@@ -92,6 +92,14 @@ defmodule Hemdal.Notifier do
 
   defp get_msg(alert, duration, :error, :error) do
     "still broken #{alert.name} on #{alert.host.name} lasting #{duration} sec"
+  end
+
+  defp get_msg(alert, duration, status, _prev) do
+    if duration && duration > 0 do
+      "#{status} #{alert.name} on #{alert.host.name} lasting #{duration} sec"
+    else
+      "#{status} #{alert.name} on #{alert.host.name}"
+    end
   end
 
   @doc """

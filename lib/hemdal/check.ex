@@ -52,10 +52,15 @@ defmodule Hemdal.Check do
   @spec stop(pid() | alert_id()) :: :ok
   def stop(pid) when is_pid(pid) do
     GenStateMachine.stop(pid)
+  catch
+    :exit, _ -> :ok
   end
 
   def stop(alert_id) do
-    GenStateMachine.stop(via(alert_id))
+    case get_pid(alert_id) do
+      nil -> :ok
+      pid -> stop(pid)
+    end
   end
 
   @typedoc """
@@ -82,12 +87,32 @@ defmodule Hemdal.Check do
   @doc """
   Reload all of the alerts based on the configuration backend. See
   `Hemdal.Config` for further information. If the alert isn't running
-  it's starting it.
+  it's starting it, and if it was removed from configuration it's stopping it.
   """
   @spec reload_all() :: :ok
   def reload_all do
-    Hemdal.Config.get_all_alerts()
-    |> Enum.each(&update_alert/1)
+    config_alerts = Hemdal.Config.get_all_alerts()
+    Enum.each(config_alerts, &update_alert/1)
+
+    config_ids = Enum.map(config_alerts, & &1.id)
+    running_ids = get_all_ids()
+
+    (running_ids -- config_ids)
+    |> Enum.each(&stop/1)
+
+    :ok
+  end
+
+  @doc """
+  Get all alert IDs that are currently running.
+  """
+  @spec get_all_ids() :: [alert_id()]
+  def get_all_ids do
+    Hemdal.Check.Registry
+    |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> Enum.filter(fn {_key, pid} -> is_pid(pid) and Process.alive?(pid) end)
+    |> Enum.map(fn {key, _pid} -> key end)
+    |> Enum.sort()
   end
 
   @doc """
@@ -106,11 +131,18 @@ defmodule Hemdal.Check do
   """
   @spec get_all() :: [returned_status()]
   def get_all do
-    DynamicSupervisor.which_children(Hemdal.Check.Supervisor)
+    DynamicSupervisor.which_children(@supervisor)
     |> Enum.map(fn {_, pid, _, _} ->
-      Task.async(fn -> get_status(pid) end)
+      Task.async(fn ->
+        try do
+          get_status(pid)
+        catch
+          :exit, _ -> nil
+        end
+      end)
     end)
     |> Enum.map(&Task.await(&1))
+    |> Enum.reject(&is_nil/1)
   end
 
   @doc """
@@ -120,10 +152,16 @@ defmodule Hemdal.Check do
   @spec get_status(pid() | alert_id()) :: [returned_status()]
   def get_status(pid) when is_pid(pid) do
     GenStateMachine.call(pid, :get_status)
+  catch
+    :exit, _ -> %{"status" => :down}
   end
 
-  def get_status(alert_id) do
-    GenStateMachine.call(via(alert_id), :get_status)
+  def get_status(alert_id) when is_binary(alert_id) do
+    if pid = get_pid(alert_id) do
+      get_status(pid)
+    else
+      %{"status" => :down}
+    end
   end
 
   @doc """
@@ -501,10 +539,19 @@ defmodule Hemdal.Check do
     )
 
     if Host.exists?(alert.host.id) do
-      Host.exec(alert.host.id, alert.command, alert.command_args)
+      Host.exec(alert.host.id, alert.command, args: alert.command_args)
     else
-      Host.start(alert.host)
-      Host.exec(alert.host.id, alert.command, alert.command_args)
+      case Host.start(alert.host) do
+        {:ok, _} ->
+          Host.exec(alert.host.id, alert.command, args: alert.command_args)
+
+        error ->
+          {:error,
+           %{
+             "status" => "FAIL",
+             "message" => "Cannot start host #{alert.host.name} (#{alert.host.id}): #{inspect(error)}"
+           }}
+      end
     end
   end
 end

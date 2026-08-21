@@ -54,6 +54,7 @@ defmodule Hemdal.Config.Backend.Json do
   see `Hemdal.Config.Alert` and `Hemdal.Config.Host` for further information.
   """
   use Hemdal.Config
+  alias Hemdal.Config.{Alert, Host}
 
   defp get_config(file) do
     Application.fetch_env!(:hemdal, Hemdal.Config)[file]
@@ -67,23 +68,25 @@ defmodule Hemdal.Config.Backend.Json do
   the alert.
   """
   @impl Hemdal.Config
-  @spec get_all_alerts() :: [Hemdal.Config.Alert.t()]
+  @spec get_all_alerts() :: [Alert.t()]
   def get_all_alerts do
     hosts =
       get_config(:hosts_file)
       |> Enum.group_by(& &1["id"])
-      |> Enum.map(fn {key, [value]} -> {key, value} end)
-      |> Map.new()
+      |> Map.new(fn {key, [value | _]} -> {key, value} end)
 
     get_config(:alerts_file)
     |> Enum.map(fn alert ->
-      host = process_credentials(hosts[alert["host_id"]])
+      host =
+        hosts[alert["host_id"]]
+        |> process_credentials()
+        |> Kernel.||(%{"id" => alert["host_id"] || "default", "name" => alert["host_id"] || "default"})
 
       alert
       |> Map.delete("host_id")
       |> Map.put("host", host)
     end)
-    |> Enum.map(&Hemdal.Config.Alert.make!/1)
+    |> Enum.map(&Alert.make!/1)
   end
 
   @doc """
@@ -92,33 +95,38 @@ defmodule Hemdal.Config.Backend.Json do
   elements.
   """
   @impl Hemdal.Config
-  @spec get_all_hosts() :: [Hemdal.Config.Host.t()]
+  @spec get_all_hosts() :: [Host.t()]
   def get_all_hosts do
     get_config(:hosts_file)
     |> Enum.map(&process_credentials/1)
-    |> Enum.map(&Hemdal.Config.Host.make!/1)
+    |> Enum.map(&Host.make!/1)
+    |> Enum.uniq_by(& &1.id)
   end
 
-  defp process_credentials(%{"credential" => credential} = host) do
-    credential =
-      credential
-      |> case do
-        %{"cert_key" => "file:" <> file} = credential ->
-          Map.put(credential, "cert_key", File.read!(file))
+  defp resolve_file_content("file:" <> file), do: File.read!(file)
+  defp resolve_file_content(other), do: other
 
-        credential ->
-          credential
-      end
-      |> case do
-        %{"cert_pub" => "file:" <> file} = credential ->
-          Map.put(credential, "cert_pub", File.read!(file))
-
-        credential ->
-          credential
-      end
-
-    Map.put(host, "credential", credential)
+  defp process_credentials(host) when is_map(host) do
+    host
+    |> process_map_field("credential")
+    |> process_map_field("options")
   end
 
-  defp process_credentials(host), do: host
+  defp process_credentials(other), do: other
+
+  defp process_map_field(map, key) do
+    case map[key] do
+      sub when is_map(sub) ->
+        processed =
+          Map.new(sub, fn
+            {k, "file:" <> _ = v} -> {k, resolve_file_content(v)}
+            {k, v} -> {k, v}
+          end)
+
+        Map.put(map, key, processed)
+
+      _ ->
+        map
+    end
+  end
 end

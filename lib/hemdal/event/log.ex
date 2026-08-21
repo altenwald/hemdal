@@ -33,8 +33,8 @@ defmodule Hemdal.Event.Log do
   end
 
   defp process_event(%{status: status, prev_status: prev}, "error")
-       when not (status == "FAIL" and prev != "FAIL") and
-              not (status != "FAIL" and prev == "FAIL") do
+       when not (status == :error and prev != :error) and
+              not (status != :error and prev == :error) do
     :ok
   end
 
@@ -47,6 +47,8 @@ defmodule Hemdal.Event.Log do
       :ok -> Logger.info(message)
       :warn -> Logger.warning(message)
       :error -> Logger.error(message)
+      :disabled -> Logger.info(message)
+      _ -> Logger.info(message)
     end
 
     :ok
@@ -81,6 +83,10 @@ defmodule Hemdal.Event.Log do
   end
 
   defp get_message(event, :error, :error) do
-    "still broken #{event.alert.name} on #{event.alert.host.name} lasting #{event.duration} sec"
+    "still broken #{event.alert.name} on #{event.alert.host.name} lasting #{event.fail_duration || "unknown"} sec"
+  end
+
+  defp get_message(event, status, _prev) do
+    "#{status} #{event.alert.name} on #{event.alert.host.name}"
   end
 end

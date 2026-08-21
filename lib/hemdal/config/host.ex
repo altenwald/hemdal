@@ -8,6 +8,6 @@ defmodule Hemdal.Config.Host do
     field(:name, :string)
     field(:module, Hemdal.Config.Module, default: Hemdal.Host.Local)
     field(:options, Hemdal.Config.Options, default: [])
-    field(:max_workers, :integer, default: 5)
+    field(:max_workers, Hemdal.Config.MaxWorkers, default: 5)
   end
 end
