@@ -3,6 +3,9 @@ defmodule HemdalTest do
 
   setup do
     Application.put_env(:hemdal, :config_module, Hemdal.Config.Backend.Env)
+    Enum.each(Hemdal.Check.get_all_ids(), &Hemdal.Check.stop/1)
+    Enum.each(Hemdal.Host.get_all(), &Hemdal.Host.stop/1)
+    :ok
   end
 
   test "get all alerts" do

@@ -1,13 +1,15 @@
 defmodule Hemdal.HostTest do
   use ExUnit.Case, async: false
 
+  alias Hemdal.Host.Local
+
   def host(id) do
     [
       id: Enum.random(1..1000),
       name: "empty alert check",
       host: [
         id: id,
-        module: Hemdal.Host.Local,
+        module: Local,
         name: "localhost",
         max_workers: 1
       ]
@@ -33,7 +35,7 @@ defmodule Hemdal.HostTest do
              module: Hemdal.Host.Local
            } = host
 
-    assert :ok = Hemdal.Host.start(host)
+    assert {:ok, _pid} = Hemdal.Host.start(host)
     assert Hemdal.Host.exists?(host.id)
 
     assert :ok = Hemdal.Host.stop(host.id)
@@ -49,7 +51,7 @@ defmodule Hemdal.HostTest do
   test "get all hosts" do
     host = Hemdal.Config.get_host_by_id!("78eb75f9-2ac7-434c-a1a2-330b23c89982")
 
-    assert :ok = Hemdal.Host.start(host)
+    assert {:ok, _pid} = Hemdal.Host.start(host)
     assert Hemdal.Host.exists?(host.id)
 
     assert host.id in Hemdal.Host.get_all()
@@ -339,5 +341,87 @@ defmodule Hemdal.HostTest do
     message = ~s|{"status": "OK",\n "message": "hello world!"}\n\x04|
     received_message = message <> message
     assert_receive {:error, %{"message" => ^received_message}}, 5_000
+  end
+
+  test "get_stats and exists? for non-existent host" do
+    assert %{status: :down} = Hemdal.Host.get_stats("non-existent-host-id")
+    refute Hemdal.Host.exists?("non-existent-host-id")
+    assert nil == Hemdal.Host.get_pid("non-existent-host-id")
+  end
+
+  test "decode false and error output handling" do
+    assert :ok = Hemdal.Host.reload_all()
+    assert [host_id, _] = Hemdal.Host.get_all()
+
+    # decode: false with exit 0
+    cmd_raw_ok = %Hemdal.Config.Command{
+      name: "raw ok",
+      type: "line",
+      command: "echo 'plain text output'",
+      decode: false
+    }
+
+    assert {:ok, %{"message" => "plain text output\n", "status" => "OK"}} =
+             Hemdal.Host.exec(host_id, cmd_raw_ok)
+
+    # decode: false with exit 1 (non-zero)
+    cmd_raw_fail = %Hemdal.Config.Command{
+      name: "raw fail",
+      type: "line",
+      command: "echo 'some error' && exit 1",
+      decode: false
+    }
+
+    assert {:error, %{"status" => "UNKNOWN", "message" => "some error\n", "errorlevel" => 1}} =
+             Hemdal.Host.exec(host_id, cmd_raw_fail)
+
+    # decode: true with malformed JSON
+    cmd_bad_json = %Hemdal.Config.Command{
+      name: "bad json",
+      type: "line",
+      command: "echo '{malformed json'",
+      decode: true
+    }
+
+    assert {:error, %{"status" => "UNKNOWN", "message" => "{malformed json\n"}} =
+             Hemdal.Host.exec(host_id, cmd_bad_json)
+  end
+
+  test "Local file write and delete operations" do
+    tmp_path = Path.join(System.tmp_dir!(), "hemdal_test_file.txt")
+    assert :ok = Local.write_file([], tmp_path, "sample content")
+    assert File.exists?(tmp_path)
+    assert :ok = Local.delete([], tmp_path)
+    refute File.exists?(tmp_path)
+  end
+
+  test "Local interactive timeout" do
+    opts = [output: true, timeout: 50]
+    # Spawns sleep and times out
+    assert {:ok, 127, _} = Local.exec_interactive([], "cat", self(), opts)
+    assert_receive {:start, _}
+    assert_receive :closed
+  end
+
+  test "get_all_stats and reload_all host removal" do
+    assert :ok = Hemdal.Host.reload_all()
+    stats_map = Hemdal.Host.get_all_stats()
+    assert is_map(stats_map)
+    assert map_size(stats_map) > 0
+
+    # Start an extra host not in config
+    extra_host =
+      Hemdal.Config.Host.make!(%{
+        id: "extra-host-to-remove",
+        name: "extra",
+        module: Local
+      })
+
+    assert {:ok, _pid} = Hemdal.Host.start(extra_host)
+    assert Hemdal.Host.exists?("extra-host-to-remove")
+
+    # Reload all: extra host not in config is stopped
+    assert :ok = Hemdal.Host.reload_all()
+    refute Hemdal.Host.exists?("extra-host-to-remove")
   end
 end

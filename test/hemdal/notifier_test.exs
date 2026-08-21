@@ -1,0 +1,150 @@
+defmodule Hemdal.NotifierTest do
+  use ExUnit.Case, async: false
+
+  alias Hemdal.Config.{Alert, Notifier}
+  alias Hemdal.Notifier.{Mattermost, Slack}
+
+  setup do
+    Tesla.Mock.mock(fn %{url: url} ->
+      cond do
+        String.contains?(url, "/services/ok") ->
+          %Tesla.Env{status: 200, body: "ok"}
+
+        String.contains?(url, "/services/fail") ->
+          %Tesla.Env{status: 500, body: "internal error"}
+
+        String.contains?(url, "mattermost.example.com") ->
+          %Tesla.Env{status: 201, body: %{"id" => "123"}}
+
+        String.contains?(url, "mattermost.fail.com") ->
+          %Tesla.Env{status: 400, body: %{"error" => "bad request"}}
+
+        true ->
+          %Tesla.Env{status: 200, body: "ok"}
+      end
+    end)
+
+    :ok
+  end
+
+  defp make_alert do
+    Alert.make!(%{
+      id: "alert-1",
+      name: "Disk Full Check",
+      host: %{
+        id: "host-1",
+        name: "db-server",
+        module: Hemdal.Host.Local
+      },
+      command: %{
+        name: "check_disk",
+        type: "line",
+        command: "echo OK"
+      }
+    })
+  end
+
+  test "notifier attach and field callbacks" do
+    field1 = Hemdal.Notifier.field("Host", "db-server")
+    assert %{"title" => "Host", "value" => "db-server", "short" => true} == field1
+
+    field2 = Hemdal.Notifier.field("Desc", "Details", false)
+    assert %{"title" => "Desc", "value" => "Details", "short" => false} == field2
+
+    att = Hemdal.Notifier.attach("Alert", "#009900", [field1, field2], "http://img.png")
+
+    assert %{
+             "title" => "Alert",
+             "color" => "#009900",
+             "fields" => [^field1, ^field2],
+             "img_url" => "http://img.png"
+           } = att
+  end
+
+  test "notifier send formats messages correctly for all statuses" do
+    alert = make_alert()
+
+    notifier =
+      Notifier.make!(%{
+        token: "TOKEN",
+        module: Hemdal.Notifier.Mock,
+        username: "CustomBot",
+        metadata: %{pid: self(), channel: "#ops", icon: ":warning:"}
+      })
+
+    # Test :disabled
+    assert :ok = Hemdal.Notifier.send(notifier, :disabled, :ok, alert, %{"message" => "off"}, 0)
+    assert_receive {:notifier, %{"text" => "disabled Disk Full Check on db-server"}, _}
+
+    # Test :ok from :ok
+    assert :ok = Hemdal.Notifier.send(notifier, :ok, :ok, alert, %{"status" => "OK"}, nil)
+    assert_receive {:notifier, %{"text" => "successful run Disk Full Check on db-server"}, _}
+
+    # Test :ok from :warn
+    assert :ok = Hemdal.Notifier.send(notifier, :ok, :warn, alert, %{"status" => "OK"}, 5)
+
+    assert_receive {:notifier, %{"text" => "successful again run Disk Full Check on db-server after 5 sec"},
+                    _}
+
+    # Test :ok from :error
+    assert :ok = Hemdal.Notifier.send(notifier, :ok, :error, alert, %{"status" => "OK"}, 12)
+    assert_receive {:notifier, %{"text" => "recovered run Disk Full Check on db-server after 12 sec"}, _}
+
+    # Test :warn from :ok
+    assert :ok = Hemdal.Notifier.send(notifier, :warn, :ok, alert, %{"status" => "WARN"}, 0)
+    assert_receive {:notifier, %{"text" => "start to fail Disk Full Check on db-server"}, _}
+
+    # Test :warn from :warn
+    assert :ok = Hemdal.Notifier.send(notifier, :warn, :warn, alert, %{"status" => "WARN"}, 10)
+    assert_receive {:notifier, %{"text" => "failing Disk Full Check on db-server lasting 10 sec"}, _}
+
+    # Test :error from :warn
+    assert :ok = Hemdal.Notifier.send(notifier, :error, :warn, alert, %{"status" => "FAIL"}, 15)
+    assert_receive {:notifier, %{"text" => "broken Disk Full Check on db-server lasting 15 sec"}, _}
+
+    # Test :error from :error
+    assert :ok = Hemdal.Notifier.send(notifier, :error, :error, alert, %{"status" => "FAIL"}, 30)
+    assert_receive {:notifier, %{"text" => "still broken Disk Full Check on db-server lasting 30 sec"}, _}
+
+    # Test unknown/fallback status
+    assert :ok = Hemdal.Notifier.send(notifier, :custom_status, nil, alert, %{}, 5)
+    assert_receive {:notifier, %{"text" => "custom_status Disk Full Check on db-server lasting 5 sec"}, _}
+  end
+
+  test "Slack notifier sends message successfully" do
+    msg = %{"text" => "hello", "channel" => "#general", "attachments" => []}
+    assert :ok = Slack.send(msg, "/services/ok", %{})
+  end
+
+  test "Slack notifier handles HTTP error responses" do
+    msg = %{"text" => "fail", "channel" => "#general", "attachments" => []}
+    assert {:error, %{status: 500}} = Slack.send(msg, "/services/fail", %{})
+  end
+
+  test "Slack notifier handles connection failure" do
+    Tesla.Mock.mock(fn _ -> {:error, :nxdomain} end)
+    msg = %{"text" => "error", "channel" => "#general", "attachments" => []}
+    assert {:error, :nxdomain} = Slack.send(msg, "/services/down", %{})
+  end
+
+  test "Mattermost notifier sends message successfully" do
+    msg = %{"text" => "hello", "channel" => "monitoring", "attachments" => []}
+    metadata = %{"base_url" => "https://mattermost.example.com/api/v4"}
+    assert :ok = Mattermost.send(msg, "token-123", metadata)
+
+    # Test with default base_url when metadata is empty
+    assert :ok = Mattermost.send(msg, "token-123", %{})
+  end
+
+  test "Mattermost notifier handles HTTP error responses" do
+    msg = %{"text" => "hello", "channel" => "monitoring", "attachments" => []}
+    metadata = %{base_url: "https://mattermost.fail.com/api/v4"}
+    assert {:error, %{status: 400}} = Mattermost.send(msg, "token-123", metadata)
+  end
+
+  test "Mattermost notifier handles connection failure" do
+    Tesla.Mock.mock(fn _ -> {:error, :econnrefused} end)
+    msg = %{"text" => "error", "channel" => "monitoring", "attachments" => []}
+    assert {:error, :econnrefused} = Mattermost.send(msg, "token-123", %{})
+  end
+end
