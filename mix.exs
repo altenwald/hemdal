@@ -1,7 +1,7 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
-  @version "1.3.0"
+  @version "1.4.0"
 
   def project do
     [
@@ -51,10 +51,11 @@ defmodule Hemdal.MixProject do
       {:gen_state_machine, "~> 3.0"},
       {:gen_stage, "~> 1.1"},
       {:construct, "~> 3.0"},
-      {:tesla, "~> 1.4"},
+      {:req, "~> 0.5"},
       {:jason, "~> 1.3"},
 
       # only for dev
+      {:plug, ">= 0.0.0", only: [:dev, :test]},
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:doctor, ">= 0.0.0", only: [:dev, :test], runtime: false},

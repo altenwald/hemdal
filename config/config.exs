@@ -1,9 +1,7 @@
 import Config
 
-config :tesla, disable_deprecated_builder_warning: true
-
 if config_env() == :test do
-  config :tesla, adapter: Tesla.Mock
+  config :req, default_options: [plug: {Req.Test, Hemdal.Notifier}]
 end
 
 if config_env() == :dev do

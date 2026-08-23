@@ -5,22 +5,48 @@ defmodule Hemdal.NotifierTest do
   alias Hemdal.Notifier.{Mattermost, Slack}
 
   setup do
-    Tesla.Mock.mock(fn %{url: url} ->
+    test_pid = self()
+
+    Req.Test.stub(Hemdal.Notifier, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      decoded_body = if body != "", do: Jason.decode!(body), else: nil
+
+      send(
+        test_pid,
+        {:captured_http,
+         %{
+           host: conn.host,
+           path: conn.request_path,
+           method: conn.method,
+           headers: Map.new(conn.req_headers),
+           body: decoded_body
+         }}
+      )
+
+      url = conn.request_path
+      host = conn.host
+
       cond do
         String.contains?(url, "/services/ok") ->
-          %Tesla.Env{status: 200, body: "ok"}
+          Req.Test.text(conn, "ok")
 
         String.contains?(url, "/services/fail") ->
-          %Tesla.Env{status: 500, body: "internal error"}
+          conn
+          |> Plug.Conn.put_status(500)
+          |> Req.Test.text("internal error")
 
-        String.contains?(url, "mattermost.example.com") ->
-          %Tesla.Env{status: 201, body: %{"id" => "123"}}
+        String.contains?(host, "mattermost.example.com") ->
+          conn
+          |> Plug.Conn.put_status(201)
+          |> Req.Test.json(%{"id" => "123"})
 
-        String.contains?(url, "mattermost.fail.com") ->
-          %Tesla.Env{status: 400, body: %{"error" => "bad request"}}
+        String.contains?(host, "mattermost.fail.com") ->
+          conn
+          |> Plug.Conn.put_status(400)
+          |> Req.Test.json(%{"error" => "bad request"})
 
         true ->
-          %Tesla.Env{status: 200, body: "ok"}
+          Req.Test.text(conn, "ok")
       end
     end)
 
@@ -111,9 +137,54 @@ defmodule Hemdal.NotifierTest do
     assert_receive {:notifier, %{"text" => "custom_status Disk Full Check on db-server lasting 5 sec"}, _}
   end
 
-  test "Slack notifier sends message successfully" do
-    msg = %{"text" => "hello", "channel" => "#general", "attachments" => []}
-    assert :ok = Slack.send(msg, "/services/ok", %{})
+  test "Slack notifier sends message successfully and captures exact payload" do
+    msg = %{
+      "text" => "Disk usage is 95%",
+      "channel" => "#monitoring",
+      "username" => "HemdalBot",
+      "icon_emoji" => ":warning:",
+      "attachments" => [
+        %{
+          "title" => "Disk Full Check",
+          "color" => "#990000",
+          "fields" => [%{"title" => "Host", "value" => "db-server", "short" => true}]
+        }
+      ]
+    }
+
+    assert :ok = Slack.send(msg, "/services/ok/T000/B000/XXXX", %{})
+
+    assert_receive {:captured_http, req}
+    assert req.host == "hooks.slack.com"
+    assert req.path == "/services/ok/T000/B000/XXXX"
+    assert req.method == "POST"
+    assert req.body == msg
+  end
+
+  test "Slack notifier triggered via Hemdal.Notifier.send sends correct format" do
+    alert = make_alert()
+
+    notifier =
+      Notifier.make!(%{
+        token: "/services/ok/T1/B1/K1",
+        module: Hemdal.Notifier.Slack,
+        username: "SlackHemdal",
+        metadata: %{"channel" => "#critical", "icon" => ":fire:"}
+      })
+
+    assert :ok = Hemdal.Notifier.send(notifier, :error, :warn, alert, %{"description" => "high disk IO"}, 42)
+
+    assert_receive {:captured_http, req}
+    assert req.host == "hooks.slack.com"
+    assert req.path == "/services/ok/T1/B1/K1"
+    assert req.body["username"] == "SlackHemdal"
+    assert req.body["channel"] == "#critical"
+    assert req.body["icon_emoji"] == ":fire:"
+    assert req.body["text"] == "broken Disk Full Check on db-server lasting 42 sec"
+
+    [attachment] = req.body["attachments"]
+    assert attachment["title"] == "Disk Full Check"
+    assert attachment["color"] == "#990000"
   end
 
   test "Slack notifier handles HTTP error responses" do
@@ -122,18 +193,77 @@ defmodule Hemdal.NotifierTest do
   end
 
   test "Slack notifier handles connection failure" do
-    Tesla.Mock.mock(fn _ -> {:error, :nxdomain} end)
+    Req.Test.stub(Hemdal.Notifier, fn conn ->
+      Req.Test.transport_error(conn, :nxdomain)
+    end)
+
     msg = %{"text" => "error", "channel" => "#general", "attachments" => []}
-    assert {:error, :nxdomain} = Slack.send(msg, "/services/down", %{})
+    assert {:error, %Req.TransportError{reason: :nxdomain}} = Slack.send(msg, "/services/down", %{})
   end
 
-  test "Mattermost notifier sends message successfully" do
-    msg = %{"text" => "hello", "channel" => "monitoring", "attachments" => []}
-    metadata = %{"base_url" => "https://mattermost.example.com/api/v4"}
-    assert :ok = Mattermost.send(msg, "token-123", metadata)
+  test "Mattermost notifier sends message successfully and captures exact payload" do
+    msg = %{
+      "text" => "CPU spike detected",
+      "channel" => "ops-channel-id",
+      "attachments" => [
+        %{
+          "title" => "CPU Check",
+          "color" => "#FFDA55",
+          "fields" => [%{"title" => "Load", "value" => "4.5", "short" => true}]
+        }
+      ]
+    }
 
-    # Test with default base_url when metadata is empty
-    assert :ok = Mattermost.send(msg, "token-123", %{})
+    metadata = %{"base_url" => "https://mattermost.example.com/api/v4"}
+    assert :ok = Mattermost.send(msg, "token-secret-123", metadata)
+
+    assert_receive {:captured_http, req}
+    assert req.host == "mattermost.example.com"
+    assert req.path == "/api/v4/posts"
+    assert req.method == "POST"
+    assert req.headers["authorization"] == "bearer token-secret-123"
+
+    assert req.body == %{
+             "channel_id" => "ops-channel-id",
+             "message" => "CPU spike detected",
+             "props" => %{
+               "attachments" => [
+                 %{
+                   "title" => "CPU Check",
+                   "color" => "#FFDA55",
+                   "fields" => [%{"title" => "Load", "value" => "4.5", "short" => true}]
+                 }
+               ]
+             }
+           }
+  end
+
+  test "Mattermost notifier triggered via Hemdal.Notifier.send sends correct format" do
+    alert = make_alert()
+
+    notifier =
+      Notifier.make!(%{
+        token: "mm-token-xyz",
+        module: Hemdal.Notifier.Mattermost,
+        username: "MattermostHemdal",
+        metadata: %{
+          "base_url" => "https://mattermost.example.com/api/v4",
+          "channel" => "channel-sys-alerts"
+        }
+      })
+
+    assert :ok = Hemdal.Notifier.send(notifier, :ok, :error, alert, %{"description" => "disk freed"}, 18)
+
+    assert_receive {:captured_http, req}
+    assert req.host == "mattermost.example.com"
+    assert req.path == "/api/v4/posts"
+    assert req.headers["authorization"] == "bearer mm-token-xyz"
+    assert req.body["channel_id"] == "channel-sys-alerts"
+    assert req.body["message"] == "recovered run Disk Full Check on db-server after 18 sec"
+
+    [attachment] = req.body["props"]["attachments"]
+    assert attachment["title"] == "Disk Full Check"
+    assert attachment["color"] == "#009900"
   end
 
   test "Mattermost notifier handles HTTP error responses" do
@@ -143,8 +273,11 @@ defmodule Hemdal.NotifierTest do
   end
 
   test "Mattermost notifier handles connection failure" do
-    Tesla.Mock.mock(fn _ -> {:error, :econnrefused} end)
+    Req.Test.stub(Hemdal.Notifier, fn conn ->
+      Req.Test.transport_error(conn, :econnrefused)
+    end)
+
     msg = %{"text" => "error", "channel" => "monitoring", "attachments" => []}
-    assert {:error, :econnrefused} = Mattermost.send(msg, "token-123", %{})
+    assert {:error, %Req.TransportError{reason: :econnrefused}} = Mattermost.send(msg, "token-123", %{})
   end
 end

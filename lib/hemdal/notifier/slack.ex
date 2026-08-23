@@ -7,12 +7,10 @@ defmodule Hemdal.Notifier.Slack do
   https://api.slack.com/messaging/webhooks
   """
   use Hemdal.Notifier
-  use Tesla
   require Logger
   alias Hemdal.Notifier
 
-  plug(Tesla.Middleware.BaseUrl, "https://hooks.slack.com")
-  plug(Tesla.Middleware.JSON)
+  @base_url "https://hooks.slack.com"
 
   @impl Hemdal.Notifier
   @doc false
@@ -20,11 +18,11 @@ defmodule Hemdal.Notifier.Slack do
   def send(slack_msg, uri, _metadata) do
     Logger.debug("sending to #{uri}: #{inspect(slack_msg)}")
 
-    case post(uri, slack_msg) do
-      {:ok, %{status: status}} when status in 200..299 ->
+    case Req.post(uri, base_url: @base_url, json: slack_msg) do
+      {:ok, %Req.Response{status: status}} when status in 200..299 ->
         :ok
 
-      {:ok, %{status: status, body: body}} ->
+      {:ok, %Req.Response{status: status, body: body}} ->
         Logger.error("cannot send message for Slack: status #{status}, body: #{inspect(body)}")
         {:error, %{status: status, body: body}}
 

@@ -7,11 +7,8 @@ defmodule Hemdal.Notifier.Mattermost do
   https://developers.mattermost.com/integrate/webhooks/incoming/
   """
   use Hemdal.Notifier
-  use Tesla
   require Logger
   alias Hemdal.Notifier
-
-  plug(Tesla.Middleware.JSON)
 
   @impl Hemdal.Notifier
   @spec send(Notifier.message(), Notifier.token(), Notifier.metadata()) :: :ok | {:error, any()}
@@ -39,12 +36,11 @@ defmodule Hemdal.Notifier.Mattermost do
       {"authorization", "bearer #{token}"}
     ]
 
-    post(url, msg, headers: headers)
-    |> case do
-      {:ok, %{status: status}} when status in 200..299 ->
+    case Req.post(url, json: msg, headers: headers) do
+      {:ok, %Req.Response{status: status}} when status in 200..299 ->
         :ok
 
-      {:ok, %{status: status, body: body}} ->
+      {:ok, %Req.Response{status: status, body: body}} ->
         Logger.error("sending: status #{status}, body: #{inspect(body)}")
         {:error, %{status: status, body: body}}
 
