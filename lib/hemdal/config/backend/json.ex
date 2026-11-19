@@ -59,7 +59,7 @@ defmodule Hemdal.Config.Backend.Json do
   defp get_config(file) do
     Application.fetch_env!(:hemdal, Hemdal.Config)[file]
     |> File.read!()
-    |> Jason.decode!()
+    |> JSON.decode!()
   end
 
   @doc """

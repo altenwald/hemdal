@@ -1,8 +1,8 @@
 defmodule Hemdal.Config.MaxWorkers do
   @moduledoc """
-  Define the max_workers implementation for `Construct`. Supports positive integers and `:infinity`.
+  Defines the `max_workers` config type. Supports non-negative integers and `:infinity`.
   """
-  @behaviour Construct.Type
+  @behaviour Hemdal.Config.Schema
 
   @typedoc "Max workers is `:infinity` or `non_neg_integer()`."
   @type t() :: :infinity | non_neg_integer()

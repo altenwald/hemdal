@@ -56,10 +56,11 @@ defmodule Hemdal.Check do
     :exit, _ -> :ok
   end
 
-  def stop(alert_id) do
-    case get_pid(alert_id) do
-      nil -> :ok
-      pid -> stop(pid)
+  def stop(alert_id) when is_binary(alert_id) do
+    if pid = get_pid(alert_id) do
+      stop(pid)
+    else
+      :ok
     end
   end
 
@@ -81,7 +82,10 @@ defmodule Hemdal.Check do
   """
   @spec get_pid(alert_id()) :: pid() | nil
   def get_pid(alert_id) do
-    GenServer.whereis(via(alert_id))
+    case GenServer.whereis(via(alert_id)) do
+      pid when is_pid(pid) -> pid
+      _ -> nil
+    end
   end
 
   @doc """
@@ -244,17 +248,17 @@ defmodule Hemdal.Check do
   end
 
   @doc false
-  def disabled({:call, from}, :get_status, state) do
+  def disabled({:call, from}, :get_status, %__MODULE__{} = state) do
     reply = build_reply(:disabled, %__MODULE__{state | status: @metadata_disabled})
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
 
-  def disabled(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+  def disabled(:cast, {:update, %Alert{enabled: false} = alert}, %__MODULE__{} = state) do
     state = %__MODULE__{state | alert: alert, last_update: NaiveDateTime.utc_now()}
     {:keep_state, state}
   end
 
-  def disabled(:cast, {:update, %Alert{} = alert}, state) do
+  def disabled(:cast, {:update, %Alert{} = alert}, %__MODULE__{} = state) do
     state = %__MODULE__{state | alert: alert}
     actions = [{:next_event, :state_timeout, :check}]
     {:next_state, :normal, state, actions}
@@ -266,7 +270,7 @@ defmodule Hemdal.Check do
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
 
-  def normal(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+  def normal(:cast, {:update, %Alert{enabled: false} = alert}, %__MODULE__{} = state) do
     state = %__MODULE__{state | alert: alert, last_update: NaiveDateTime.utc_now()}
 
     Event.notify(%Event{
@@ -281,7 +285,7 @@ defmodule Hemdal.Check do
     {:next_state, :disabled, state}
   end
 
-  def normal(:cast, {:update, alert}, state) do
+  def normal(:cast, {:update, alert}, %__MODULE__{} = state) do
     {:keep_state, %__MODULE__{state | alert: alert, last_update: NaiveDateTime.utc_now()}}
   end
 
@@ -346,7 +350,7 @@ defmodule Hemdal.Check do
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
 
-  def failing(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+  def failing(:cast, {:update, %Alert{enabled: false} = alert}, %__MODULE__{} = state) do
     state = %__MODULE__{state | alert: alert, last_update: NaiveDateTime.utc_now()}
     t = ellapsed(state.fail_started)
 
@@ -363,7 +367,7 @@ defmodule Hemdal.Check do
     {:next_state, :disabled, state}
   end
 
-  def failing(:cast, {:update, alert}, state) do
+  def failing(:cast, {:update, alert}, %__MODULE__{} = state) do
     {:keep_state, %__MODULE__{state | alert: alert}}
   end
 
@@ -466,7 +470,7 @@ defmodule Hemdal.Check do
     {:keep_state_and_data, [{:reply, from, reply}]}
   end
 
-  def broken(:cast, {:update, %Alert{enabled: false} = alert}, state) do
+  def broken(:cast, {:update, %Alert{enabled: false} = alert}, %__MODULE__{} = state) do
     state = %__MODULE__{state | alert: alert, last_update: NaiveDateTime.utc_now()}
     t = ellapsed(state.fail_started)
     now = NaiveDateTime.utc_now()
@@ -484,7 +488,7 @@ defmodule Hemdal.Check do
     {:next_state, :disabled, state}
   end
 
-  def broken(:cast, {:update, alert}, state) do
+  def broken(:cast, {:update, alert}, %__MODULE__{} = state) do
     {:keep_state, %__MODULE__{state | alert: alert, last_update: NaiveDateTime.utc_now()}}
   end
 

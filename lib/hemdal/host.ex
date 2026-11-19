@@ -74,7 +74,12 @@ defmodule Hemdal.Host do
   """
   @spec start(Hemdal.Config.Host.t()) :: {:ok, pid()} | {:error, any()}
   def start(host) do
-    DynamicSupervisor.start_child(@sup_name, {__MODULE__, [host]})
+    case DynamicSupervisor.start_child(@sup_name, {__MODULE__, [host]}) do
+      {:ok, pid} -> {:ok, pid}
+      {:ok, pid, _info} -> {:ok, pid}
+      :ignore -> {:error, :ignore}
+      {:error, _reason} = error -> error
+    end
   end
 
   @doc """
@@ -142,8 +147,8 @@ defmodule Hemdal.Host do
   @spec exec(host_id(), Hemdal.Config.Command.t(), exec_opts()) :: {:ok, map()} | {:error, map()}
   def exec(host_id, cmd, opts \\ [])
 
-  def exec(host_id, %Command{} = cmd, args) when is_list(args) and args != [] and not is_tuple(hd(args)) do
-    exec(host_id, cmd, args: args)
+  def exec(host_id, %Command{} = cmd, [arg | _] = args) when is_binary(arg) do
+    exec(host_id, cmd, args: Enum.filter(args, &is_binary/1))
   end
 
   def exec(host_id, %Command{interactive: true} = cmd, opts) do
@@ -176,9 +181,8 @@ defmodule Hemdal.Host do
           {:ok, pid()} | {:error, any()}
   def exec_background(host_id, cmd, opts \\ [])
 
-  def exec_background(host_id, %Command{} = cmd, args)
-      when is_list(args) and args != [] and not is_tuple(hd(args)) do
-    exec_background(host_id, cmd, args: args)
+  def exec_background(host_id, %Command{} = cmd, [arg | _] = args) when is_binary(arg) do
+    exec_background(host_id, cmd, args: Enum.filter(args, &is_binary/1))
   end
 
   def exec_background(host_id, cmd, opts) do
@@ -193,7 +197,10 @@ defmodule Hemdal.Host do
   """
   @spec get_pid(host_id()) :: pid() | nil
   def get_pid(host_id) do
-    GenServer.whereis(via(host_id))
+    case GenServer.whereis(via(host_id)) do
+      pid when is_pid(pid) -> pid
+      _ -> nil
+    end
   end
 
   @doc """
@@ -343,7 +350,7 @@ defmodule Hemdal.Host do
     {:noreply, %__MODULE__{state | queue: queue}}
   end
 
-  def handle_call({:exec_background, caller, cmd, args}, _from, state) do
+  def handle_call({:exec_background, caller, cmd, args}, _from, %__MODULE__{} = state) do
     send_result = &send(caller, &1)
     {worker, _ref} = spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
     workers = state.workers + 1
@@ -372,7 +379,7 @@ defmodule Hemdal.Host do
     {:noreply, %__MODULE__{state | queue: queue}}
   end
 
-  def handle_call({:exec, caller, cmd, args}, from, state) do
+  def handle_call({:exec, caller, cmd, args}, from, %__MODULE__{} = state) do
     send_result = &GenServer.reply(from, &1)
     spawn_monitor(fn -> run_in_background(caller, cmd, args, send_result, state) end)
     workers = state.workers + 1
@@ -395,7 +402,7 @@ defmodule Hemdal.Host do
 
   @impl GenServer
   @doc false
-  def handle_cast({:update, host}, state) do
+  def handle_cast({:update, host}, %__MODULE__{} = state) do
     old_max = state.max_workers
     new_max = host.max_workers
 
@@ -434,8 +441,8 @@ defmodule Hemdal.Host do
   defp launch_extra(%__MODULE__{workers: max_workers, max_workers: max_workers} = state, false),
     do: state
 
-  defp launch_extra(state, false) do
-    {{:value, {info, from}}, queue} = Queue.out(state.queue)
+  defp launch_extra(%__MODULE__{queue: prev_queue} = state, false) do
+    {{:value, {info, from}}, queue} = Queue.out(prev_queue)
 
     case handle_call(info, from, %__MODULE__{state | queue: queue}) do
       {:noreply, state} ->
@@ -449,7 +456,7 @@ defmodule Hemdal.Host do
 
   @impl GenServer
   @doc false
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, %__MODULE__{} = state) do
     {next, queue} = Queue.out(state.queue)
     state = %__MODULE__{state | queue: queue, workers: state.workers - 1}
     len = Queue.len(queue)
@@ -544,15 +551,15 @@ defmodule Hemdal.Host do
   end
 
   defp decode(output, errorlevel, true) do
-    case Jason.decode(output) do
+    case JSON.decode(output) do
       {:ok, [status, message]} ->
         {:ok, %{"status" => status, "message" => message, "errorlevel" => errorlevel}}
 
       {:ok, status} when is_binary(status) ->
         {:ok, %{"status" => status, "errorlevel" => errorlevel}}
 
-      {:error, %Jason.DecodeError{data: error}} ->
-        {:error, %{"message" => error, "status" => "UNKNOWN", "errorlevel" => errorlevel}}
+      {:error, _reason} ->
+        {:error, %{"message" => output, "status" => "UNKNOWN", "errorlevel" => errorlevel}}
 
       other_resp ->
         other_resp

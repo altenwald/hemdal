@@ -1,10 +1,8 @@
 defmodule Hemdal.Config.Options do
   @moduledoc """
-  Define the options (`Keyword`) implementation for `Construct`. This way we
-  can use the `Hemdal.Config.Options` everywhere the `options` entry is
-  needed.
+  Defines the options (`Keyword.t()` or `map()`) config type.
   """
-  @behaviour Construct.Type
+  @behaviour Hemdal.Config.Schema
 
   @typedoc "Options is `Keyword.t()` or `map()`."
   @type t() :: Keyword.t() | map()

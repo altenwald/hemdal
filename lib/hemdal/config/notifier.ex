@@ -20,11 +20,33 @@ defmodule Hemdal.Config.Notifier do
   - `metadata` the extra data sent to the notifier.
   """
 
-  use Construct do
-    field(:token, :string)
-    field(:module, Hemdal.Config.Module, default: Hemdal.Notifier.Slack)
-    field(:username, :string)
-    field(:log_level, :string, default: "warn")
-    field(:metadata, :map, default: %{})
-  end
+  alias Hemdal.Config.{Module, Schema}
+
+  @fields [
+    {:token, :string, []},
+    {:module, Module, [default: Hemdal.Notifier.Slack]},
+    {:username, :string, []},
+    {:log_level, :string, [default: "warn"]},
+    {:metadata, :map, [default: %{}]}
+  ]
+
+  @type t() :: %__MODULE__{
+          token: String.t() | nil,
+          module: module(),
+          username: String.t() | nil,
+          log_level: String.t(),
+          metadata: map()
+        }
+
+  defstruct token: nil,
+            module: Hemdal.Notifier.Slack,
+            username: nil,
+            log_level: "warn",
+            metadata: %{}
+
+  @spec make(map() | keyword(), keyword()) :: {:ok, t()} | {:error, map()}
+  def make(params \\ %{}, opts \\ []), do: Schema.make(__MODULE__, @fields, params, opts)
+
+  @spec make!(map() | keyword(), keyword()) :: t()
+  def make!(params \\ %{}, opts \\ []), do: Schema.make!(__MODULE__, @fields, params, opts)
 end

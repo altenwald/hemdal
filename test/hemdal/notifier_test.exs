@@ -9,7 +9,7 @@ defmodule Hemdal.NotifierTest do
 
     Req.Test.stub(Hemdal.Notifier, fn conn ->
       {:ok, body, conn} = Plug.Conn.read_body(conn)
-      decoded_body = if body != "", do: Jason.decode!(body), else: nil
+      decoded_body = if body != "", do: JSON.decode!(body), else: nil
 
       send(
         test_pid,

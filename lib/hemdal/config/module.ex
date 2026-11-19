@@ -4,7 +4,7 @@ defmodule Hemdal.Config.Module do
   `Hemdal.Host` implementations to define which modules will be in use for
   each case.
   """
-  @behaviour Construct.Type
+  @behaviour Hemdal.Config.Schema
 
   @typedoc "Module is `module()`."
   @type t() :: module()

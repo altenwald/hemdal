@@ -22,13 +22,39 @@ defmodule Hemdal.Config.Command do
     or a multi-line script.
   """
 
-  use Construct do
-    field(:name, :string)
-    field(:type, :string)
-    field(:interactive, :boolean, default: false)
-    field(:output, :boolean, default: true)
-    field(:idle_timeout, :integer, default: :timer.minutes(1))
-    field(:decode, :boolean, default: true)
-    field(:command, :string, default: nil)
-  end
+  alias Hemdal.Config.Schema
+
+  @fields [
+    {:name, :string, []},
+    {:type, :string, []},
+    {:interactive, :boolean, [default: false]},
+    {:output, :boolean, [default: true]},
+    {:idle_timeout, :integer, [default: :timer.minutes(1)]},
+    {:decode, :boolean, [default: true]},
+    {:command, :string, [default: nil]}
+  ]
+
+  @type t() :: %__MODULE__{
+          name: String.t() | nil,
+          type: String.t() | nil,
+          interactive: boolean(),
+          output: boolean(),
+          idle_timeout: integer(),
+          decode: boolean(),
+          command: String.t() | nil
+        }
+
+  defstruct name: nil,
+            type: nil,
+            interactive: false,
+            output: true,
+            idle_timeout: :timer.minutes(1),
+            decode: true,
+            command: nil
+
+  @spec make(map() | keyword(), keyword()) :: {:ok, t()} | {:error, map()}
+  def make(params \\ %{}, opts \\ []), do: Schema.make(__MODULE__, @fields, params, opts)
+
+  @spec make!(map() | keyword(), keyword()) :: t()
+  def make!(params \\ %{}, opts \\ []), do: Schema.make!(__MODULE__, @fields, params, opts)
 end

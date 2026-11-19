@@ -11,7 +11,7 @@ defmodule Hemdal.HostLifecycleTest do
       maybe_signal_test(get_opt(host, :test_pid))
       ip = get_opt(host, :ip) || "unknown"
       name = host.name
-      {:ok, 0, Jason.encode!(%{"status" => "OK", "message" => "connected to #{name}@#{ip}"})}
+      {:ok, 0, JSON.encode!(%{"status" => "OK", "message" => "connected to #{name}@#{ip}"})}
     end
 
     defp maybe_signal_test(pid) when is_pid(pid) do

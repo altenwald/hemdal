@@ -23,20 +23,51 @@ defmodule Hemdal.Config.Alert do
     the name of the command, and the command type. See `Hemdal.Config.Command`.
   - `notifiers` is a list of `Hemdal.Config.Notifier`.
   """
-  alias Hemdal.Config.{Command, Host, Notifier}
+  alias Hemdal.Config.{Command, Host, Notifier, Schema}
 
-  use Construct do
-    field(:id, :string)
-    field(:enabled, :boolean, default: true)
-    field(:name, :string)
-    field(:check_in_sec, :integer, default: 60)
-    field(:recheck_in_sec, :integer, default: 5)
-    field(:broken_recheck_in_sec, :integer, default: 30)
-    field(:retries, :integer, default: 3)
-    field(:command_args, {:array, :string}, default: [])
+  @fields [
+    {:id, :string, []},
+    {:enabled, :boolean, [default: true]},
+    {:name, :string, []},
+    {:check_in_sec, :integer, [default: 60]},
+    {:recheck_in_sec, :integer, [default: 5]},
+    {:broken_recheck_in_sec, :integer, [default: 30]},
+    {:retries, :integer, [default: 3]},
+    {:command_args, {:array, :string}, [default: []]},
+    {:host, Host, []},
+    {:command, Command, []},
+    {:notifiers, {:array, Notifier}, [default: []]}
+  ]
 
-    field(:host, Host)
-    field(:command, Command)
-    field(:notifiers, {:array, Notifier}, default: [])
-  end
+  @type t() :: %__MODULE__{
+          id: String.t() | nil,
+          enabled: boolean(),
+          name: String.t() | nil,
+          check_in_sec: integer(),
+          recheck_in_sec: integer(),
+          broken_recheck_in_sec: integer(),
+          retries: integer(),
+          command_args: [String.t()],
+          host: Host.t() | nil,
+          command: Command.t() | nil,
+          notifiers: [Notifier.t()]
+        }
+
+  defstruct id: nil,
+            enabled: true,
+            name: nil,
+            check_in_sec: 60,
+            recheck_in_sec: 5,
+            broken_recheck_in_sec: 30,
+            retries: 3,
+            command_args: [],
+            host: nil,
+            command: nil,
+            notifiers: []
+
+  @spec make(map() | keyword(), keyword()) :: {:ok, t()} | {:error, map()}
+  def make(params \\ %{}, opts \\ []), do: Schema.make(__MODULE__, @fields, params, opts)
+
+  @spec make!(map() | keyword(), keyword()) :: t()
+  def make!(params \\ %{}, opts \\ []), do: Schema.make!(__MODULE__, @fields, params, opts)
 end

@@ -1,13 +1,13 @@
 defmodule Hemdal.MixProject do
   use Mix.Project
 
-  @version "1.4.0"
+  @version "1.5.0"
 
   def project do
     [
       app: :hemdal,
       version: @version,
-      elixir: "~> 1.10",
+      elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -15,11 +15,12 @@ defmodule Hemdal.MixProject do
       description: "Hemdal Alarms/Alerts System",
       docs: docs(),
       package: package(),
-      test_coverage: coverage(),
-      preferred_cli_env: [
-        check: :test
-      ]
+      test_coverage: coverage()
     ]
+  end
+
+  def cli do
+    [preferred_envs: [check: :test]]
   end
 
   defp coverage do
@@ -50,13 +51,11 @@ defmodule Hemdal.MixProject do
     [
       {:gen_state_machine, "~> 3.0"},
       {:gen_stage, "~> 1.1"},
-      {:construct, "~> 3.0"},
       {:req, "~> 0.5"},
-      {:jason, "~> 1.3"},
 
       # only for dev
       {:plug, ">= 0.0.0", only: [:dev, :test]},
-      {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:prisma, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:doctor, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.16", only: [:dev, :test], runtime: false},
