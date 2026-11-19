@@ -1,4 +1,9 @@
 defmodule Hemdal.Config.MakeError do
+  @moduledoc """
+  Raised by the `make!/2` functions of the configuration structures when the
+  given parameters are not valid.
+  """
+
   defexception [:reason, :params]
 
   @impl true
@@ -22,6 +27,10 @@ defmodule Hemdal.Config.Schema do
 
   @callback cast(term()) :: {:ok, term()} | {:error, term()} | :error
 
+  @doc """
+  Builds the `mod` struct from `params` following the `fields` definition.
+  Returns `{:ok, struct}` or `{:error, errors}` with the errors by field.
+  """
   @spec make(module(), [field_spec()], map() | keyword(), keyword()) ::
           {:ok, struct()} | {:error, map()}
   def make(mod, fields, params, opts \\ [])
@@ -36,30 +45,7 @@ defmodule Hemdal.Config.Schema do
 
   def make(mod, fields, %{} = params, opts) do
     {attrs, errors} =
-      Enum.reduce(fields, {%{}, %{}}, fn {name, type, field_opts}, {acc, errs} ->
-        case fetch_param(params, name) do
-          {:ok, nil} ->
-            if Keyword.has_key?(field_opts, :default) do
-              {Map.put(acc, name, Keyword.get(field_opts, :default)), errs}
-            else
-              {acc, Map.put(errs, name, :missing)}
-            end
-
-          {:ok, value} ->
-            case cast_value(type, value, opts) do
-              {:ok, cast} -> {Map.put(acc, name, cast), errs}
-              {:error, reason} -> {acc, Map.put(errs, name, reason)}
-              :error -> {acc, Map.put(errs, name, :invalid)}
-            end
-
-          :error ->
-            if Keyword.has_key?(field_opts, :default) do
-              {Map.put(acc, name, Keyword.get(field_opts, :default)), errs}
-            else
-              {acc, Map.put(errs, name, :missing)}
-            end
-        end
-      end)
+      Enum.reduce(fields, {%{}, %{}}, fn field, acc -> put_field(field, params, opts, acc) end)
 
     if map_size(errors) == 0 do
       {:ok, struct!(mod, attrs)}
@@ -70,11 +56,43 @@ defmodule Hemdal.Config.Schema do
 
   def make(_mod, _fields, _params, _opts), do: {:error, %{params: :invalid}}
 
+  @doc """
+  Same as `make/4` but returns the struct or raises `Hemdal.Config.MakeError`.
+  """
   @spec make!(module(), [field_spec()], map() | keyword(), keyword()) :: struct()
   def make!(mod, fields, params, opts \\ []) do
     case make(mod, fields, params, opts) do
       {:ok, struct} -> struct
       {:error, reason} -> raise Hemdal.Config.MakeError, reason: reason, params: params
+    end
+  end
+
+  defp put_field({name, type, field_opts}, params, opts, {attrs, errors}) do
+    result =
+      case fetch_param(params, name) do
+        {:ok, nil} -> default_or_missing(field_opts)
+        {:ok, value} -> cast_field(type, value, opts)
+        :error -> default_or_missing(field_opts)
+      end
+
+    case result do
+      {:ok, value} -> {Map.put(attrs, name, value), errors}
+      {:error, reason} -> {attrs, Map.put(errors, name, reason)}
+    end
+  end
+
+  defp default_or_missing(field_opts) do
+    case Keyword.fetch(field_opts, :default) do
+      {:ok, default} -> {:ok, default}
+      :error -> {:error, :missing}
+    end
+  end
+
+  defp cast_field(type, value, opts) do
+    case cast_value(type, value, opts) do
+      {:ok, _} = ok -> ok
+      {:error, _} = error -> error
+      :error -> {:error, :invalid}
     end
   end
 

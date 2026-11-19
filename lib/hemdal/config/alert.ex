@@ -65,9 +65,17 @@ defmodule Hemdal.Config.Alert do
             command: nil,
             notifiers: []
 
+  @doc """
+  Builds the structure from a map or keyword list of parameters. Returns
+  `{:ok, struct}` or `{:error, errors}` with the errors by field.
+  """
   @spec make(map() | keyword(), keyword()) :: {:ok, t()} | {:error, map()}
   def make(params \\ %{}, opts \\ []), do: Schema.make(__MODULE__, @fields, params, opts)
 
+  @doc """
+  Same as `make/2` but returns the structure or raises
+  `Hemdal.Config.MakeError`.
+  """
   @spec make!(map() | keyword(), keyword()) :: t()
   def make!(params \\ %{}, opts \\ []), do: Schema.make!(__MODULE__, @fields, params, opts)
 end
